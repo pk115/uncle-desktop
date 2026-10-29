@@ -13,6 +13,27 @@
 
 ---
 
+## 🎭 ตัวละครที่มีให้เลือกใช้งาน (Selectable Characters)
+
+สามารถคลิกขวาที่ตัวละครหรือถาดระบบ แล้วเลือก **"เลือกตัวละคร…"** ได้เลย มีให้เลือกถึง 13 คาแรคเตอร์ พร้อมรองรับการเพิ่มตัวละครของคุณเอง:
+
+| UncleDev (หนุ่มหัวร้อน) | Blacky (แมวดำ) | Mira (สาว AI) | Pinky (เสือชมพู) |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/angry-boy/portrait.png" width="120" /> | <img src="assets/characters/blacky/portrait.png" width="120" /> | <img src="assets/characters/mira/portrait.png" width="120" /> | <img src="assets/characters/pinky/portrait.png" width="120" /> |
+
+| Bald Man (ลุงผมบาง) | Cute Girl | Drunk Uncle (ลุงขี้เมา) | Lazy Boy (หนุ่มขี้เซา) |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/bald-man/portrait.png" width="120" /> | <img src="assets/characters/cute-girl/portrait.png" width="120" /> | <img src="assets/characters/drunk-uncle/portrait.png" width="120" /> | <img src="assets/characters/lazy-boy/portrait.png" width="120" /> |
+
+| Chubby Girl | Fatty Girl | Angry Guy | Vulture |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/chubby-girl/portrait.png" width="120" /> | <img src="assets/characters/fatty-girl/portrait.png" width="120" /> | <img src="assets/characters/angry-guy/portrait.png" width="120" /> | <img src="assets/characters/vulture/portrait.png" width="120" /> |
+
+*(และตัวละครดั้งเดิม **Capri** จาก Cyberpunk: Edgerunners)*  
+ดูรายละเอียดเพิ่มเติมและวิธีสร้างตัวละครของตัวเองได้ที่ [docs/CHARACTERS.md](docs/CHARACTERS.md) และ [docs/ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md)
+
+---
+
 ## ฟีเจอร์เด่นใน Uncle Desktop
 
 - **รองรับภาษาไทยเต็มรูปแบบ:**

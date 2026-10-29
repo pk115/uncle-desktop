@@ -13,6 +13,27 @@
 
 ---
 
+## 🎭 Selectable Characters Gallery
+
+Right-click the character or system tray icon and select **"Choose Character…"** to switch between 13 available characters or import your own:
+
+| UncleDev | Blacky | Mira | Pinky |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/angry-boy/portrait.png" width="120" /> | <img src="assets/characters/blacky/portrait.png" width="120" /> | <img src="assets/characters/mira/portrait.png" width="120" /> | <img src="assets/characters/pinky/portrait.png" width="120" /> |
+
+| Bald Man | Cute Girl | Drunk Uncle | Lazy Boy |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/bald-man/portrait.png" width="120" /> | <img src="assets/characters/cute-girl/portrait.png" width="120" /> | <img src="assets/characters/drunk-uncle/portrait.png" width="120" /> | <img src="assets/characters/lazy-boy/portrait.png" width="120" /> |
+
+| Chubby Girl | Fatty Girl | Angry Guy | Vulture |
+| :---: | :---: | :---: | :---: |
+| <img src="assets/characters/chubby-girl/portrait.png" width="120" /> | <img src="assets/characters/fatty-girl/portrait.png" width="120" /> | <img src="assets/characters/angry-guy/portrait.png" width="120" /> | <img src="assets/characters/vulture/portrait.png" width="120" /> |
+
+*(Plus the original **Capri** from Cyberpunk: Edgerunners)*  
+Learn how to import and customize characters in [docs/CHARACTERS.md](docs/CHARACTERS.md) and [docs/ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md).
+
+---
+
 ## What Uncle Desktop Adds & Features
 
 - **Thai Language Support (รองรับภาษาไทยเต็มรูปแบบ):** Default Thai UI, system tray & context menus, Chakra Petch Thai font, Thai date/time parsing, and Thai chat commands (see [docs/THAI_SUPPORT.md](docs/THAI_SUPPORT.md)).
