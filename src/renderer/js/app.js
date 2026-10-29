@@ -10,6 +10,8 @@ import { Chat } from './chat.js';
 import { Setup } from './setup.js';
 import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
+import { Speech } from './speech.js';
+import { Listening } from './listening.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
 import { Look } from './look.js';
@@ -40,6 +42,8 @@ const mine = (cfg) => ({ userName: cfg.userName || '', persona: cfg.persona || '
 async function boot() {
   const config = await host.getConfig();
   let picker = null;
+  let speechUI = null;
+  let listeningUI = null;
   const loadCharacter = (character) => Promise.all([
     loadImage(characterAsset(character, 'atlas')),
     loadImage(characterAsset(character, 'portrait')),
@@ -125,13 +129,18 @@ async function boot() {
   };
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
-    if (picker?.open) return setInteractive(true);
+    if (picker?.open || speechUI?.open || listeningUI?.open) return setInteractive(true);
     if (capri.dragging) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
     const onPanel = r && mouse.x >= r.left && mouse.x <= r.right && mouse.y >= r.top && mouse.y <= r.bottom;
+    const stop = document.getElementById('speech-stop');
+    const s = stop.getBoundingClientRect();
+    const onSpeech = !stop.hidden && mouse.x >= s.left && mouse.x <= s.right && mouse.y >= s.top && mouse.y <= s.bottom;
+    const micStop = document.getElementById('listening-stop'); const micRect = micStop.getBoundingClientRect();
+    const onMic = !micStop.hidden && mouse.x >= micRect.left && mouse.x <= micRect.right && mouse.y >= micRect.top && mouse.y <= micRect.bottom;
     document.body.style.cursor = onChip() ? 'pointer' : '';
-    return setInteractive(Boolean(onPanel || capri.hit(mouse.x, mouse.y) || onChip()));
+    return setInteractive(Boolean(onPanel || onSpeech || onMic || capri.hit(mouse.x, mouse.y) || onChip()));
   };
   // Her biochip: her eyes on it follow the pointer over it, and she comes out when you click it
   // (only then, so the pointer passing through that corner doesn't call her back).
@@ -277,12 +286,24 @@ async function boot() {
       if (capri.character.id !== characterId) throw new Error('Character unavailable');
     },
     onVisibility: (open) => {
-      capri.pickerOpen = open;
+      capri.pickerOpen = open || speechUI?.open || listeningUI?.open;
       host.focusOverlay(open);
       if (open) setInteractive(true);
       else refreshHit();
     },
   });
+  speechUI = new Speech({ host, root: document.getElementById('speech-settings'), stopButton: document.getElementById('speech-stop'),
+    lastReply: () => chat.history.findLast((message) => message.role === 'assistant')?.content || '',
+    onVisibility: (open) => { capri.pickerOpen = open || picker.open || listeningUI?.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+  });
+  speechUI.configure(config);
+  listeningUI = new Listening({ host, root: document.getElementById('listening-settings'), indicator: document.getElementById('listening-stop'), speech: speechUI, chat,
+    onWake: () => { capri.wake(); if (capri.mode !== 'alert') capri.perform('curious', capri.towardCenter()); },
+    onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+  });
+  listeningUI.configure(config);
+  chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
+  chat.onSpeechStop = () => { speechUI.stop(); listeningUI.stop(); };
   brain.onTalk = () => chat.start();
   // Getting her chat going with buttons (setup.js): Ollama and a model, a key, or an address
   const setup = new Setup({ guide, panel, host, brain, capri, voice });
@@ -562,7 +583,7 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
-  window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, screens: () => screens };
+  window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
   host.onWindows((data) => {
@@ -653,6 +674,8 @@ async function boot() {
   });
 
   host.onConfig((cfg) => {
+    speechUI.configure(cfg);
+    listeningUI.configure(cfg);
     picker?.setCharacters(cfg.characters);
     voice.configure(cfg);
     jealousy.enabled = cfg.jealous !== false;
@@ -690,10 +713,19 @@ async function boot() {
   });
 
   host.onCommand(async (cmd) => {
+    if (cmd.name === 'listening') { picker.hide(); speechUI.hide(); await listeningUI.show(); return; }
+    if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
+    if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
+    if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
     const t = brain.t;
     switch (cmd.name) {
       case 'characters':
+        speechUI.hide();
         picker.show();
+        break;
+      case 'speech':
+        picker.hide();
+        speechUI.show();
         break;
       case 'teleport':
         capri.teleport(capri.spot('random'));

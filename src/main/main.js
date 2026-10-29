@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, protocol, net, shell, globalShortcut, nativeImage,
-  clipboard, ClipboardItem, dialog, powerMonitor, desktopCapturer,
+  clipboard, ClipboardItem, dialog, powerMonitor, desktopCapturer, safeStorage,
 } = require('electron');
 const { randomUUID } = require('node:crypto');
 
@@ -14,6 +14,10 @@ const config = require('./config');
 const { CHARACTERS, characterFor } = require('./characters');
 const { createUserCharacters } = require('./user-characters');
 let userCharacters;
+const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES } = require('./speech');
+const speech = createSpeech({ script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
+const { createListening, listeningSettings } = require('./listening');
+let listening;
 const { TRAY, LANGS } = require('./labels');
 const { createBridge } = require('./bridge');
 const { startWindowWatch } = require('./windows');
@@ -159,6 +163,10 @@ function rearmOverlay() {
   overlay.setIgnoreMouseEvents(false);
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.setAlwaysOnTop(true, 'screen-saver');
+  overlay.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(contents === overlay?.webContents && contents.getURL().startsWith('capri://app/') && permission === 'media' && details.mediaTypes?.length > 0 && details.mediaTypes.every(type => type === 'audio'));
+  });
+  overlay.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => contents === overlay?.webContents && contents.getURL().startsWith('capri://app/') && permission === 'media' && details.mediaType === 'audio');
   fitOverlay();
   sendCommand('rearmed'); // click-through again: she waits for the pointer to be on her
   console.log('[capri] mouse hook set up again');
@@ -294,6 +302,9 @@ function rendererConfig() {
 }
 
 function updateConfig(patch) {
+  if ('listening' in patch) patch.listening = listeningSettings(patch.listening);
+  if ('characterId' in patch || patch.visible === false || 'listening' in patch) listening?.stop();
+  if (patch.muted === true || 'speech' in patch || 'characterId' in patch) speech.stop();
   if ('characterId' in patch && !CHARACTERS.some((c) => c.id === patch.characterId)) throw new Error('Unknown character');
   const changedCharacter = 'characterId' in patch && patch.characterId !== characterFor(config.load().characterId).id;
   config.save(patch);
@@ -349,6 +360,9 @@ function rebuildTray() {
     { label: t.help, click: () => sendCommand('welcome') },
     ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
     { label: t.talk, click: () => sendCommand('chat') },
+    { label: resolveLang(cfg.lang) === 'th' ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
+    { label: 'สั่งงานด้วยเสียง / ตั้งคำเรียก…', click: () => sendCommand('listening') },
+    { label: 'ปิดไมโครโฟนทันที', click: () => { listening?.stop(); sendCommand('listening-stop'); } },
     { label: t.lookNow, click: () => sendCommand('look') },
     {
       label: t.reminders,
@@ -705,6 +719,34 @@ function createTray() {
 }
 
 function registerIpc() {
+  listening = createListening({ directory: path.join(app.getPath('userData'), 'voice-models') });
+  ipcMain.handle('listening:info', async () => ({ ...await listening.info(listeningSettings(config.load().listening).localModel), settings: listeningSettings(config.load().listening), hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY), hasGeminiKey: Boolean(setup.openKeys(config.load().apiKeys).gemini || process.env.GEMINI_API_KEY) }));
+  ipcMain.handle('listening:save', (_e, value, key) => {
+    const settings = listeningSettings(value), patch = { listening: settings };
+    if (key) {
+      if (!['openai', 'gemini'].includes(settings.provider) || typeof key !== 'string' || key.length > 512 || /[\r\n]/.test(key)) throw new Error('API key ไม่ถูกต้อง');
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows ยังเข้ารหัสคีย์ไม่ได้');
+      patch.apiKeys = { ...config.load().apiKeys, [settings.provider]: setup.sealKey(key.trim()) };
+    }
+    updateConfig(patch); return settings;
+  });
+  ipcMain.handle('listening:install', (_e, model) => listening.install(text => overlay?.webContents.send('listening:progress', text), model));
+  ipcMain.handle('listening:transcribe', (_e, { bytes, wakeOnly } = {}) => listening.transcribe(bytes, config.load().listening, listeningSettings(config.load().listening).provider === 'gemini' ? setup.openKeys(config.load().apiKeys).gemini || process.env.GEMINI_API_KEY : setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY, Boolean(wakeOnly)));
+  ipcMain.on('listening:stop', () => listening.stop());
+  ipcMain.handle('speech:info', async (_e, refresh) => ({ settings: speechSettings(config.load().speech), voices: await speech.voices(Boolean(refresh)).catch(() => []), cloudVoices: CLOUD_VOICES, edgeVoices: EDGE_VOICES, hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY) }));
+  ipcMain.handle('speech:save', (_e, { settings, key } = {}) => {
+    const patch = { speech: speechSettings(settings) };
+    if (key) {
+      if (typeof key !== 'string' || key.length > 512 || /[\r\n]/.test(key)) throw new Error('API key ไม่ถูกต้อง');
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows ยังเข้ารหัสคีย์ไม่ได้ กรุณาลองใหม่');
+      patch.apiKeys = { ...config.load().apiKeys, openai: `enc:${safeStorage.encryptString(key.trim()).toString('base64')}` };
+    }
+    updateConfig(patch);
+    return patch.speech;
+  });
+  ipcMain.handle('speech:speak', (_e, text) => speech.speak(text, config.load().speech, setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY));
+  ipcMain.on('speech:stop', () => speech.stop());
+  ipcMain.on('speech:windowsSettings', () => shell.openExternal('ms-settings:speech'));
   ipcMain.handle('characters:preview', (_e, bytes) => userCharacters.preview(bytes));
   ipcMain.handle('characters:add', (_e, draft) => {
     const character = userCharacters.add(draft);
@@ -1108,6 +1150,9 @@ function main() {
       onDebug: DEV ? debugHandler : null,
     });
     globalShortcut.register('Control+Alt+C', () => toggleVisible());
+    const voiceKey = globalShortcut.register('Control+Alt+V', () => sendCommand('listening-toggle'));
+    const muteKey = globalShortcut.register('Control+Alt+M', () => { listening?.stop(); sendCommand('listening-stop'); });
+    if (!voiceKey || !muteKey) console.warn('[uncle] Voice shortcut unavailable; use the voice window or tray menu');
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
@@ -1127,6 +1172,8 @@ function main() {
   });
 
   app.on('will-quit', () => {
+    speech.stop();
+    listening?.stop();
     globalShortcut.unregisterAll();
     windowWatch?.stop();
   });

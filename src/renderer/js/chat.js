@@ -260,6 +260,7 @@ export class Chat {
   }
 
   close() {
+    this.onSpeechStop?.();
     if (!this.open) return;
     this.open = false;
     if (this.turn) this.host.chatStop(this.turn);
@@ -384,14 +385,22 @@ export class Chat {
   }
 
   // an answer of hers, kept with your message before it
-  remember(message) {
+  remember(message, { silent = false } = {}) {
     this.history.push(message);
     this.history = this.history.slice(-KEEP);
     this.host.chatRemember(this.history, this.brain.character?.id);
+    if (message.role === 'assistant' && !silent) this.onReply?.(message.content);
+  }
+
+  voiceResult(line) {
+    if (this.open) this.panel.stream(line, { done: true });
+    else this.panel.say({ kind: 'info', face: 'look', line, hold: 8000 });
+    this.remember({ role: 'assistant', content: line }, { silent: true });
   }
 
   listApps() {
     this.appsReady = this.host.openApps().then((list) => { this.apps = list || []; }).catch(() => {});
+    return this.appsReady;
   }
 
   // What you asked plainly, read off your message (a small model doesn't always write its tag right):
