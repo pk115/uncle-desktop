@@ -1,5 +1,13 @@
 # Uncle Desktop
 
+**0.7.0:** voice commands send automatically by default, with spoken confirmation for app closing/risky launches, yes/no follow-up and 20-second expiry. Basic actions use existing tools directly. [Voice guide](docs/VOICE_COMMANDS_TH.md).
+
+**0.6.0 voice commands:** push-to-talk, selectable microphone, editable wake phrases, optional follow-up conversation, local Thai STT or OpenAI, transcript review and immediate mic-off. See [voice setup and test limitations](docs/VOICE_COMMANDS_TH.md). Microphone starts off each launch; local wake detection requires the optional model download.
+
+[Current implementation status and feature roadmap from lachydotmcg (Thai)](docs/FEATURE_ROADMAP_TH.md). This Electron project already includes chat actions, character selection/import and TTS; microphone input, custom wake phrases and follow-up conversation are available in 0.6.0; lip sync and OpenCode remain planned.
+
+**0.5.0:** Windows installer and speech settings are available. Right-click → **เสียงพูดภาษาไทย…** to use installed Windows voices or OpenAI TTS, test/stop speech, adjust rate/volume, and optionally read chat replies aloud. Windows Thai requires an installed Thai voice; OpenAI requires your API key and consent and may incur API charges. See [speech setup and validation limits](docs/SPEECH_TH.md).
+
 [ภาษาไทย](README.th.md) · **English** · [Français](README.fr.md) · [Original Capri Documentation](README.upstream.md)
 
 > [!NOTE]
@@ -86,3 +94,8 @@ npm start
 - Forked and inspired by [mochiiwuff/capri-desktop](https://github.com/mochiiwuff/capri-desktop) (Original author: mochiiwuff).
 - Maintained and customized by **TheUncleDev** ([pk115/uncle-desktop](https://github.com/pk115/uncle-desktop)).
 - Licensed under [PolyForm Noncommercial 1.0.0](LICENSE).
+
+
+### 0.8.0 — Thai speech recognition
+
+Local Thai-tuned Thonburian medium, Gemini transcription, configurable pause duration and vocabulary, and a no-action voice test with model/timing diagnostics. See [Thai voice guide](docs/VOICE_COMMANDS_TH.md).

@@ -1,5 +1,15 @@
 # Uncle Desktop
 
+**รุ่น 0.7.0:** โหมดเสียงส่งคำสั่งเอง ถามยืนยันก่อนปิดโปรแกรม/เปิดรายการเสี่ยง รับคำตอบใช่–ไม่ใช่โดยไม่เรียกซ้ำ และยกเลิกเมื่อหมดเวลา 20 วินาที คำสั่งพื้นฐานใช้เครื่องมือจริงโดยตรง ดู [คู่มือเสียง](docs/VOICE_COMMANDS_TH.md)
+
+เพิ่มเสียงไทย Edge ชาย/หญิงพร้อมเลือกในโปรแกรม ไม่ต้องติดตั้งเสียง Windows หรือใส่คีย์ (ต้องใช้อินเทอร์เน็ต) พร้อมเก็บ Windows และ OpenAI ไว้ครบ ดู [บริการเสียงทั้งสามแบบ](docs/SPEECH_TH.md)
+
+**รุ่น 0.6.0:** เพิ่มกดพูด/รอคำเรียกที่ตั้งเอง เลือกไมค์ คุยต่อหลังปลุก ถอดเสียงไทยในเครื่องหรือ OpenAI ตรวจข้อความก่อนส่ง และคีย์ลัดปิดไมค์ ดู [วิธีใช้และข้อจำกัด](docs/VOICE_COMMANDS_TH.md) ไมค์ปิดเมื่อเริ่มโปรแกรมทุกครั้ง
+
+ดู [สถานะโค้ดปัจจุบันและแผนเพิ่มฟีเจอร์จาก lachydotmcg](docs/FEATURE_ROADMAP_TH.md): มีแชตและคำสั่งเปิดแอป/เพลง ตัวละคร และ TTS แล้ว; รุ่น 0.6.0 รับเสียงจากไมค์และตั้งคำเรียกได้แล้ว; งานค้างคือหน้าตั้งค่ารวม Screen Vision ที่มี preview ขยับปาก และ OpenCode Hub
+
+**รุ่น 0.5.0:** มีตัวติดตั้ง Windows และหน้า **เสียงพูดภาษาไทย…** ในเมนูคลิกขวา เลือกเสียง Windows หรือ OpenAI TTS พร้อมทดสอบ/หยุดเสียง ปรับความเร็วและระดับเสียง และอ่านแชตอัตโนมัติได้ เสียงไทย Windows ต้องติดตั้งเพิ่มหากยังไม่มี ส่วน OpenAI ต้องใช้คีย์และยินยอมส่งข้อความ โดยอาจมีค่าบริการ ดู [คู่มือและข้อจำกัดการทดสอบเสียง](docs/SPEECH_TH.md)
+
 **ภาษาไทย** · [English](README.md) · [Français](README.fr.md) · [คู่มือต้นฉบับ Capri](README.upstream.md)
 
 > [!NOTE]
@@ -39,7 +49,7 @@
 - **รองรับภาษาไทยเต็มรูปแบบ:**
   - เมนูคลิกขวา, ถาดระบบ (System Tray), หน้าต่างการตั้งค่า และหน้าต่างแนะนำรองรับภาษาไทย
   - มาพร้อมฟอนต์ภาษาไทย Chakra Petch สวยงามโดยไม่ต้องดาวน์โหลดเพิ่ม
-  - รองรับการสั่งงานด้วยเสียง/แชตภาษาไทย การแปลงเวลาและตัวเลขไทย (ดูรายละเอียดเพิ่มเติมที่ [docs/THAI_SUPPORT.md](docs/THAI_SUPPORT.md))
+  - รองรับคำสั่งผ่านแชตภาษาไทย การแปลงเวลาและตัวเลขไทย; รุ่น 0.6.0 รับเสียงไมค์แบบกดพูด/คำเรียกได้ พร้อมอ่านคำตอบออกเสียง (ดู [คู่มือภาษาไทย](docs/THAI_SUPPORT.md) และ [คู่มือเสียง](docs/SPEECH_TH.md))
 - **เปลี่ยนและนำเข้าตัวละครได้ (Selectable Characters):**
   - สลับตัวละครได้หลากหลาย หรือนำเข้าตัวละครใหม่ๆ ด้วยตัวเอง (ดู [docs/CHARACTERS.md](docs/CHARACTERS.md) และ [docs/ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md))
 - **ติดตามสถานะของ Coding AI แบบเรียลไทม์:**
@@ -95,3 +105,8 @@ npm start
 - พัฒนาและดูแลต่อโดย **TheUncleDev** ([pk115/uncle-desktop](https://github.com/pk115/uncle-desktop))
 - ใช้งานภายใต้สัญญาอนุญาต [PolyForm Noncommercial 1.0.0](LICENSE)
 
+
+
+### 0.8.0 — Thai speech recognition
+
+Local Thai-tuned Thonburian medium, Gemini transcription, configurable pause duration and vocabulary, and a no-action voice test with model/timing diagnostics. See [Thai voice guide](docs/VOICE_COMMANDS_TH.md).
