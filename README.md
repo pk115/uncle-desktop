@@ -86,6 +86,7 @@ npm start
 - `npm run hooks:codex:install` — Install hooks for Codex.
 - `npm run hooks:install` — Install hooks for Claude Code.
 - `npm run dist` — Build the Windows NSIS installer.
+- `npm run release` — Build and upload the installer to a draft GitHub Release (needs `GH_TOKEN`). Publish the draft and installed copies update themselves.
 
 ---
 

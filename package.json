@@ -21,7 +21,8 @@
     "hooks:agy:uninstall": "node scripts/install-hooks-agy.js --uninstall",
     "check:llm": "node scripts/check-llm.js",
     "test:hooks": "node --test tests/hooks.test.js",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "keywords": [
     "desktop-companion",
@@ -42,6 +43,7 @@
   "dependencies": {
     "@fontsource/chakra-petch": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
+    "electron-updater": "^6.8.11",
     "node-edge-tts": "1.2.12"
   },
   "build": {
