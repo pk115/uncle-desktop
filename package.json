@@ -1,6 +1,6 @@
 {
   "name": "uncle-desktop",
-  "version": "0.4.4",
+  "version": "0.8.0",
   "description": "A Thai-friendly AI desktop companion with selectable characters and coding agent status.",
   "author": "TheUncleDev",
   "repository": "github:pk115/uncle-desktop",
@@ -52,8 +52,15 @@
       "assets/**",
       "hooks/**",
       "scripts/**",
+      "!scripts/run-app.js",
+      "!scripts/test-*.js",
+      "!scripts/smoke-*.js",
       "package.json",
-      "LICENSE"
+      "LICENSE",
+      "README.md",
+      "README.th.md",
+      "README.upstream.md",
+      "docs/*.md"
     ],
     "asarUnpack": [
       "hooks/**",
