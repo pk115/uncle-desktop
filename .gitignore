@@ -7,3 +7,14 @@ Thumbs.db
 
 # local debug captures
 captures/
+
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/config.json
+/memory*.json
+/work/
+/tmp/

@@ -11,6 +11,9 @@ const {
 const { randomUUID } = require('node:crypto');
 
 const config = require('./config');
+const { CHARACTERS, characterFor } = require('./characters');
+const { createUserCharacters } = require('./user-characters');
+let userCharacters;
 const { TRAY, LANGS } = require('./labels');
 const { createBridge } = require('./bridge');
 const { startWindowWatch } = require('./windows');
@@ -53,17 +56,17 @@ const chats = new Map(); // id -> AbortController of an answer being streamed
 const userSoundsDir = () => path.join(app.getPath('userData'), 'sounds');
 
 // Her memory of your chats, across restarts: { history: [{ role, content }], claude: Claude Code's session }
-const memoryFile = () => path.join(app.getPath('userData'), 'memory.json');
-function readMemory() {
+const memoryFile = (characterId = config.load().characterId) => path.join(app.getPath('userData'), characterFor(characterId).id === 'capri' ? 'memory.json' : `memory-${characterFor(characterId).id}.json`);
+function readMemory(characterId) {
   try {
-    return JSON.parse(fs.readFileSync(memoryFile(), 'utf8'));
+    return JSON.parse(fs.readFileSync(memoryFile(characterId), 'utf8'));
   } catch {
     return {};
   }
 }
-function saveMemory(patch) {
+function saveMemory(patch, characterId) {
   try {
-    fs.writeFileSync(memoryFile(), JSON.stringify({ ...readMemory(), ...patch }));
+    fs.writeFileSync(memoryFile(characterId), JSON.stringify({ ...readMemory(characterId), ...patch }));
   } catch (err) {
     console.error('[capri] could not save her memory:', err.message);
   }
@@ -79,6 +82,11 @@ function forgetChats() {
 function serveProtocol() {
   protocol.handle('capri', (request) => {
     const url = new URL(request.url);
+    if (url.host === 'app' && url.pathname.startsWith('/user-characters/')) {
+      const match = /^\/user-characters\/(custom-[a-f0-9-]{36})\/(atlas\.png|portrait\.png)$/.exec(url.pathname);
+      if (!match) return new Response('forbidden', { status: 403 });
+      return net.fetch(pathToFileURL(userCharacters.imagePath(match[1], match[2])).toString());
+    }
     const base = url.host === 'usersounds' ? userSoundsDir() : ROOT;
     const target = path.resolve(base, '.' + decodeURIComponent(url.pathname));
     if (target !== base && !target.startsWith(base + path.sep)) {
@@ -281,11 +289,18 @@ function resolveLang(setting) {
 // What the overlay gets: `lang` is the resolved one, `langSetting` what the user picked.
 function rendererConfig() {
   const { apiKeys, ...cfg } = config.load(); // the keys stay here: the overlay only learns which ones are set
-  return { ...cfg, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
+  const character = characterFor(cfg.characterId);
+  return { ...cfg, characterId: character.id, character, characters: CHARACTERS, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
 }
 
 function updateConfig(patch) {
+  if ('characterId' in patch && !CHARACTERS.some((c) => c.id === patch.characterId)) throw new Error('Unknown character');
+  const changedCharacter = 'characterId' in patch && patch.characterId !== characterFor(config.load().characterId).id;
   config.save(patch);
+  if (changedCharacter) {
+    for (const abort of chats.values()) abort.abort();
+    llm.resetClaude();
+  }
   if ('rest' in patch) {
     fitOverlay(); // the taskbar in her window or not
     windowWatch?.refresh();
@@ -303,6 +318,12 @@ function rebuildTray() {
   const watched = activeAssistant();
   const t = Object.fromEntries(Object.entries(TRAY[resolveLang(cfg.lang)]).map(([key, value]) =>
     [key, typeof value === 'string' && watched.id !== 'claude' ? value.replaceAll('Claude Code', watched.name) : value]));
+  const selectedCharacter = characterFor(cfg.characterId);
+  const online = t.online;
+  t.online = (port) => online(port).replace('Capri', selectedCharacter.name);
+  tray.setToolTip(selectedCharacter.name + ' · Desktop Companion');
+  const portraitPath = selectedCharacter.custom ? userCharacters.imagePath(selectedCharacter.id, 'portrait.png') : path.join(ROOT, 'assets/characters', selectedCharacter.portrait);
+  tray.setImage(nativeImage.createFromPath(portraitPath).resize({ width: 24, height: 24 }));
 
   const screens = displays();
   const current = targetDisplay().id;
@@ -339,6 +360,15 @@ function rebuildTray() {
         : [{ label: t.noReminders, enabled: false }],
     },
     { label: t.custom, click: () => sendCommand('customize') },
+    { label: t.character + '…', click: () => sendCommand('characters') },
+    {
+      label: t.character + (resolveLang(cfg.lang) === 'th' ? ' (เปลี่ยนด่วน)' : ' (quick switch)'),
+      submenu: CHARACTERS.map((character) => ({
+        label: resolveLang(cfg.lang) === 'th' ? character.nameTh : character.name,
+        type: 'radio', checked: characterFor(cfg.characterId).id === character.id,
+        click: () => updateConfig({ characterId: character.id }),
+      })),
+    },
     { label: cfg.visible ? t.hide : t.show, accelerator: 'Ctrl+Alt+C', click: () => toggleVisible() },
     { type: 'separator' },
     {
@@ -381,7 +411,8 @@ function rebuildTray() {
         { label: t.aiSetup, click: () => sendCommand('setupChat') },
         { type: 'separator' },
         ...Object.entries(llm.PROVIDERS).map(([provider, p]) => ({
-          label: p.label, type: 'radio', checked: cfg.provider === provider, click: () => pickProvider(provider),
+          label: resolveLang(cfg.lang) === 'th' ? p.label.replace('(local)', '(ในเครื่อง)').replace('(local :8080)', '(ในเครื่อง :8080)').replace('(no key)', '(ไม่ต้องใช้คีย์)').replace('Custom (customUrl in config)', 'กำหนดเอง (ตั้งค่า customUrl)').replace('(sends to the terminal agent)', '(ส่งให้ agent ในเทอร์มินัล)') : p.label,
+          type: 'radio', checked: cfg.provider === provider, click: () => pickProvider(provider),
         })),
         { type: 'separator' },
         ...(chatModels?.length
@@ -668,12 +699,35 @@ async function pickClaudeFolder() {
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
   tray = new Tray(icon);
-  tray.setToolTip('Capri');
+  tray.setToolTip('Uncle Desktop');
   tray.on('click', () => sendCommand('status'));
   rebuildTray();
 }
 
 function registerIpc() {
+  ipcMain.handle('characters:preview', (_e, bytes) => userCharacters.preview(bytes));
+  ipcMain.handle('characters:add', (_e, draft) => {
+    const character = userCharacters.add(draft);
+    updateConfig({});
+    return character;
+  });
+  ipcMain.handle('characters:remove', (_e, id) => {
+    if (!CHARACTERS.some((c) => c.id === id && c.custom)) throw new Error('ลบได้เฉพาะตัวละครที่เพิ่มเอง');
+    if (config.load().characterId === id) updateConfig({ characterId: 'angry-boy' });
+    userCharacters.remove(id);
+    return updateConfig({});
+  });
+  ipcMain.handle('characters:sample', async () => {
+    const result = await dialog.showSaveDialog(overlay, { title: 'บันทึกภาพตัวอย่าง', defaultPath: path.join(app.getPath('downloads'), 'companion-example.png'), filters: [{ name: 'PNG', extensions: ['png'] }] });
+    if (result.canceled || !result.filePath) return false;
+    fs.copyFileSync(path.join(ROOT, 'assets/characters/example.png'), result.filePath);
+    return true;
+  });
+  ipcMain.handle('characters:copyPrompt', (_e, text) => {
+    if (typeof text !== 'string' || text.length > 6000) throw new Error('Invalid prompt');
+    clipboard.writeText(text);
+    return true;
+  });
   ipcMain.on('overlay:interactive', (_e, on) => {
     overlay?.setIgnoreMouseEvents(!on, { forward: true });
   });
@@ -736,7 +790,7 @@ function registerIpc() {
       };
       const cfg = config.load();
       const text = await chatWithFallback(cfg, messages, send, abort.signal, () => streamed);
-      if (cfg.provider === 'claude') saveMemory({ claude: llm.claudeMemory() });
+      if (cfg.provider === 'claude' && cfg.characterId === config.load().characterId && !abort.signal.aborted) saveMemory({ claude: llm.claudeMemory() });
       return { ok: true, text };
     } catch (err) {
       return { ok: false, error: abort.signal.aborted ? 'stopped' : err.message, code: err.code || null };
@@ -779,7 +833,9 @@ function registerIpc() {
     return { local: llm.isLocal(cfg.provider, cfg, model), provider, model };
   });
   ipcMain.handle('chat:memory', () => readMemory().history || []);
-  ipcMain.on('chat:remember', (_e, history) => Array.isArray(history) && saveMemory({ history }));
+  ipcMain.on('chat:remember', (_e, { history, characterId } = {}) => {
+    if (Array.isArray(history) && CHARACTERS.some((c) => c.id === characterId)) saveMemory({ history }, characterId);
+  });
   ipcMain.on('chat:ollama', () => shell.openExternal(OLLAMA_SITE));
   // setting her up with buttons (setup.js): Ollama and a model, or a key, or an address
   const progress = (payload) => overlay?.webContents.send('setup:progress', payload);
@@ -1018,15 +1074,19 @@ function applyRender() {
 }
 
 function main() {
+  // Keep existing settings, imported characters and chat history across the rename.
+  app.setPath('userData', path.join(app.getPath('appData'), 'capri-desktop'));
   applyRender();
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return;
   }
   app.on('second-instance', () => sendCommand('status'));
-  if (process.platform === 'win32') app.setAppUserModelId('capri.desktop');
+  if (process.platform === 'win32') app.setAppUserModelId('uncle.desktop');
 
   app.whenReady().then(() => {
+    userCharacters = createUserCharacters(path.join(app.getPath('userData'), 'characters'), nativeImage, CHARACTERS);
+    userCharacters.load();
     if (!['codex', 'claude'].includes(config.load().assistant)) config.save({ assistant: activeAssistant().id });
     serveProtocol();
     registerIpc();

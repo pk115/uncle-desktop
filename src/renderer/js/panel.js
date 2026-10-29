@@ -1,6 +1,6 @@
 // The transmission panel next to Capri, and the one-line ticker she wears while Claude works.
 
-import { clamp, ease, reducedMotion } from './util.js';
+import { clamp, ease, reducedMotion, graphemes } from './util.js';
 
 const NOISE = '▚▞▙▟░▒#%&/\\<>01XZ';
 
@@ -175,7 +175,7 @@ export class Panel {
 
   // Change her expression; the swap glitches across a couple of drawings.
   setFace(name) {
-    const src = FACE_DIR + (FACES[name] || FACES.grin);
+    const src = this.characterPortraits?.[name] || this.characterPortraits?.default || FACE_DIR + (FACES[name] || FACES.grin);
     if (this.portrait.getAttribute('src') === src) return;
     this.portrait.setAttribute('src', src);
     if (reducedMotion.matches) return;
@@ -313,7 +313,7 @@ export class Panel {
   // up faster the further behind it is (Claude Code's answer comes in one piece), and glitches once done.
   stream(text, { done = false } = {}) {
     if (!this.current?.chat) return;
-    this.streamTo = [...text];
+    this.streamTo = graphemes(text);
     this.streamDone = done;
     // an answer rewritten rather than added to (a reasoning block cut out, an error): from where they part
     let same = 0;
@@ -488,7 +488,7 @@ export class Panel {
       this.line.textContent = text;
       return;
     }
-    const chars = [...text];
+    const chars = graphemes(text);
     let done = 0;
     this.onTalk?.(true);
     const step = () => {

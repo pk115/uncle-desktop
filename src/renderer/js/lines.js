@@ -1,7 +1,10 @@
 // What Capri says. She's a personality construct — dozens of minds in one — so she
 // sometimes talks as "we". Slang is Night City's: choom, preem, nova, flatline.
 
+import { TH } from './th.js';
+
 export const LINES = {
+  th: TH,
   fr: {
     state: { work: 'EN COURS', done: 'TERMINÉ', alert: 'ATTENTE', error: 'ERREUR', info: 'SYNC', idle: 'VEILLE', remind: 'RAPPEL' },
     hello: [
@@ -1772,6 +1775,7 @@ const OTHERS = {
     name: 'Codex', file: 'hooks.json', dir: '.codex',
     // before the click, and after it
     ask: {
+      th: 'เชื่อมฉันกับ Codex ไหม? คลิกครั้งเดียว แล้วเปิด Codex ใหม่และอนุญาต hooks เมื่อระบบถาม',
       en: 'Want me to plug into Codex? One click, then restart Codex and trust my hooks when it asks.',
       fr: 'Tu veux que je me branche sur Codex ? Un clic, puis relance Codex et autorise mes hooks quand il te le demande.',
       es: '¿Quieres que me conecte a Codex? Un clic, y luego reinicia Codex y autoriza mis hooks cuando te lo pida.',
@@ -1779,6 +1783,7 @@ const OTHERS = {
       ru: 'Подключиться к Codex? Один клик, потом перезапусти Codex и разреши мои хуки, когда он спросит.',
     },
     after: {
+      th: 'เปิด Codex ใหม่และอนุญาต hooks เมื่อระบบถาม เมื่อเริ่มทำงานฉันจะแจ้งให้ทราบ',
       en: 'Now restart Codex and trust my hooks when it asks. As soon as it does something, I’ll tell you.',
       fr: 'Maintenant relance Codex et autorise mes hooks quand il te le demande. Dès qu’il fait quelque chose, je te le dis.',
       es: 'Ahora reinicia Codex y autoriza mis hooks cuando te lo pida. En cuanto haga algo, te aviso.',
@@ -1789,6 +1794,7 @@ const OTHERS = {
   agy: {
     name: 'Antigravity', file: 'hooks.json', dir: '.gemini',
     ask: {
+      th: 'เชื่อมฉันกับ Antigravity ไหม? คลิกครั้งเดียว แล้วเริ่มบทสนทนาใหม่ในแอป',
       en: 'Want me to plug into Antigravity? One click, then start a new conversation in it.',
       fr: 'Tu veux que je me branche sur Antigravity ? Un clic, puis lance une nouvelle conversation dedans.',
       es: '¿Quieres que me conecte a Antigravity? Un clic, y luego empieza una conversación nueva en él.',
@@ -1796,6 +1802,7 @@ const OTHERS = {
       ru: 'Подключиться к Antigravity? Один клик, потом начни в нём новый разговор.',
     },
     after: {
+      th: 'เริ่มบทสนทนาใหม่ใน Antigravity เมื่อเริ่มทำงานฉันจะแจ้งให้ทราบ',
       en: 'Now start a new conversation in Antigravity. As soon as it does something, I’ll tell you.',
       fr: 'Maintenant lance une nouvelle conversation dans Antigravity. Dès qu’il fait quelque chose, je te le dis.',
       es: 'Ahora empieza una conversación nueva en Antigravity. En cuanto haga algo, te aviso.',
@@ -1805,8 +1812,31 @@ const OTHERS = {
   },
 };
 const converted = new Map();
-export function linesFor(lang, assistant = 'claude') {
-  const base = LINES[lang] || LINES.fr;
+export function linesFor(lang, assistant = 'claude', character = null) {
+  if (character?.renderer === 'capri') return linesFor(lang, assistant);
+  if (character) {
+    const key = `character:${character.id}:${assistant}:${lang}`;
+    if (converted.has(key)) return converted.get(key);
+    const replace = (value) => {
+      if (typeof value === 'string') return value.replace(/\bCapri\b/g, character.name);
+      if (Array.isArray(value)) return value.map(replace);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replace(v)]));
+      return value;
+    };
+    const result = replace(linesFor(lang, assistant));
+    if (lang === 'th') {
+      result.hello = [`สวัสดี ฉันคือ ${character.name}`, 'พร้อมแล้ว วันนี้เราจะสร้างอะไรกัน?', 'ฉันจะคอยดูงาน {project} ให้', 'ฉันอยู่ตรงนี้ พร้อมเป็นเพื่อนคุณ'];
+    } else if (lang === 'en') {
+      result.hello = [`Hi, I'm ${character.name}.`, 'Ready. What are we building?', 'Keeping an eye on {project}.', "I'm here to keep you company."];
+    }
+    if (lang === 'th' || lang === 'en') {
+      result.chat.note = lang === 'th' ? `คำตอบสร้างโดย AI ในเครื่อง · ${character.name}` : `AI-generated replies on this PC · ${character.name}`;
+      result.chat.noteCloud = lang === 'th' ? `คำตอบสร้างโดย AI ออนไลน์ · ${character.name}` : `AI-generated online replies · ${character.name}`;
+    }
+    converted.set(key, result);
+    return result;
+  }
+  const base = LINES[lang] || LINES.en;
   const other = OTHERS[assistant];
   if (!other) return base;
   const key = `${assistant}:${lang}`;

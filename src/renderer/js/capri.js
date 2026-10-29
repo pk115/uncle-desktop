@@ -7,7 +7,7 @@
 // pointer ("held"), flying through the air when you throw her or she jumps to another screen
 // ("fly"), and knocked down on the floor after a crash ("down").
 
-import { SpriteRenderer, SPRITE } from './sprite.js';
+import { createCharacterRenderer, SPRITE } from './character-renderer.js';
 import { ACTS, NEUTRAL, Player } from './acting.js';
 import { sleep, rand, pick, clamp, lerp, ease, tween, reducedMotion, today } from './util.js';
 
@@ -23,7 +23,7 @@ const DEG = Math.PI / 180;
 // Thrown (throwHer): her middle, where she spins and where she's held while she flies (sprite px),
 // how fast the pointer has to be going when you let go of her for her to fly instead of drop
 // (px/s), and as fast as she goes.
-const MID = { x: 118, y: 232 };
+const MID = { x: SPRITE.feet.x, y: 232 };
 const THROW_MIN = 650;
 const THROW_MAX = 4200;
 const THROW_GRAVITY = 2500;
@@ -38,10 +38,11 @@ const INK = [0.08, 0.06, 0.11];
 const RED = [1, 0.13, 0.32];
 
 export class Capri {
-  constructor({ root, canvas, image, fx, voice }) {
+  constructor({ root, canvas, image, character, fx, voice }) {
     this.root = root;
     this.canvas = canvas;
-    this.sprite = new SpriteRenderer(canvas, image);
+    this.character = character;
+    this.sprite = createCharacterRenderer(canvas, image, character);
     this.fx = fx;
     this.voice = voice;
 
@@ -119,7 +120,7 @@ export class Capri {
     this.onCross = null;  // async (side, at) => moves her window over to it: { y } there, or null
     this.onScreenOf = null; // async (cursor) => her window moved to the screen the pointer is on: the pointer there
 
-    this.alphaMap = this.buildAlphaMap(image);
+    this.alphaMap = this.sprite.pixels;
     this.hull = buildHull(this.alphaMap);
     this.setScale(this.scale);
     this.bindPointer();
@@ -129,23 +130,15 @@ export class Capri {
 
   // ---------- geometry ----------
 
-  // Her silhouette at rest, for hit tests: the cut-out plus the mirrored right arm the shader adds.
-  buildAlphaMap(image) {
-    const { width: w, height: h, mirror } = SPRITE;
-    const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(image, 0, 0);
-    const data = ctx.getImageData(0, 0, w, h).data;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (!SPRITE.armL(x, y) || mirror - x >= w) continue;
-        const to = (y * w + mirror - x) * 4 + 3;
-        data[to] = Math.max(data[to], data[(y * w + x) * 4 + 3]);
-      }
-    }
-    return data;
+  setCharacter(image, character) {
+    const next = createCharacterRenderer(this.canvas, image, character);
+    this.sprite.dispose?.();
+    this.sprite = next;
+    this.character = character;
+    this.alphaMap = this.sprite.pixels;
+    this.hull = buildHull(this.alphaMap);
+    this.setScale(this.scale);
+    this.drawFrame();
   }
 
   setScale(scale) {
@@ -283,15 +276,10 @@ export class Capri {
     const at = this.spritePoint(x, y);
     const sx = at.x;
     let sy = at.y;
-    if (this.p.sit > 0 && sy > SPRITE.hip) {
-      // same fold as the shader: short thighs, legs ridden up
-      const c = lerp(1, 0.3, this.p.sit);
-      sy = sy <= SPRITE.hip + THIGH * c ? SPRITE.hip + (sy - SPRITE.hip) / c : sy + THIGH * (1 - c);
-    }
     for (const [dx, dy] of [[0, 0], [4, 0], [-4, 0], [0, 4], [0, -4]]) {
       const px = Math.round(sx + dx), py = Math.round(sy + dy);
       if (px < 0 || py < 0 || px >= SPRITE.width || py >= SPRITE.height) continue;
-      if (this.alphaMap[(py * SPRITE.width + px) * 4 + 3] > 40) return true;
+      if (this.sprite.pixels[(py * SPRITE.width + px) * 4 + 3] > 40) return true;
     }
     return false;
   }
@@ -427,7 +415,8 @@ export class Capri {
   drawFrame(now = performance.now()) {
     this.lastDraw = now;
     this.animate(now);
-    this.sprite.draw(this.p);
+    const reaction = now < (this.reactionUntil || 0) ? this.reaction : '';
+    this.sprite.draw(this.p, { mode: this.mode, act: this.act?.player.name, reaction });
     this.place();
   }
 
@@ -487,6 +476,7 @@ export class Capri {
   }
 
   behave(now) {
+    if (this.pickerOpen) return;
     if (this.stance === 'fall') {
       this.updateFall(now);
       return;
@@ -1081,6 +1071,8 @@ export class Capri {
   }
 
   async hurt() {
+    this.reaction = 'error';
+    this.reactionUntil = performance.now() + 1800;
     this.perform('flinch');
     if (reducedMotion.matches) return;
     const p = this.p;
@@ -1098,6 +1090,8 @@ export class Capri {
   // Job done: the victory sequence (acting.js), its effects on cue. onSpeak runs when she
   // comes back down (that's when the "done" panel comes in), or at the end if anything cut it short.
   async celebrate({ onSpeak } = {}) {
+    this.reaction = 'success';
+    this.reactionUntil = performance.now() + 3600;
     this.onSpeak = onSpeak;
     if (reducedMotion.matches || this.stowed || this.dormant || SPUN.has(this.stance)) {
       this.voice.play('done');
@@ -1265,6 +1259,8 @@ export class Capri {
   // Asleep a while: her mane and her body come apart (shards drifting down, the drawing
   // dissolving) and all that's left is her mask, floating there, eyes shut (chip.js Mask).
   async doze() {
+    // These characters keep their sleeping body instead of becoming Capri's mask.
+    if (this.character?.renderer !== 'capri') return;
     if (this.busy || this.dormant || this.stowed || this.hidden) return;
     this.busy = true;
     this.endAct(false);

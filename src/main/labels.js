@@ -4,8 +4,22 @@
 // The order of this object is the order of the Language submenu.
 
 const TRAY = {
+  th: {
+    name: 'ภาษาไทย', character: 'เลือกตัวละคร', online: (port) => `Capri — พร้อมรับสถานะที่พอร์ต ${port}`,
+    teleport: 'ย้ายตำแหน่ง', satellite: 'มองดาวเทียม', demo: 'เล่นการสาธิต', help: 'ใช้งานอย่างไร?',
+    report: 'สรุปภารกิจ', talk: 'คุยกับตัวละคร', custom: 'ปรับแต่งตัวละคร…', chatModel: 'โมเดล AI', aiSetup: 'ตั้งค่า AI…', apiKey: 'คีย์ API หรือที่อยู่…', noOllama: 'ไม่พบ Ollama',
+    rest: 'ตำแหน่งพัก', restCorner: 'มุมหน้าจอ', restTaskbar: 'นั่งบนแถบงาน', watch: 'ติดตามสถานะ', watchNone: 'ไม่ติดตาม อยู่เป็นเพื่อนเท่านั้น',
+    motion: 'ภาพเคลื่อนไหว', motionAuto: 'ตามการตั้งค่า Windows', motionFull: 'เต็มรูปแบบ', motionReduced: 'ลดการเคลื่อนไหว',
+    display: 'การแสดงผล', displayAuto: 'ปกติ', displayGl: 'OpenGL (เมื่อพื้นหลังเป็นสีดำ)', displaySoftware: 'ไม่ใช้การ์ดจอ (หากพื้นหลังยังดำ)',
+    show: 'แสดงตัวละคร', hide: 'ซ่อนตัวละคร', size: 'ขนาด', small: 'เล็ก', medium: 'กลาง', large: 'ใหญ่', sound: 'เสียง', mute: 'ปิดเสียง',
+    soundsDir: 'เปิดโฟลเดอร์เสียงที่กำหนดเอง', screen: 'หน้าจอ', wander: 'เดินเล่นเมื่อว่าง', possess: 'เล่นเอฟเฟกต์กับหน้าต่าง', lang: 'ภาษา', auto: 'อัตโนมัติตามระบบ', startup: 'เริ่มพร้อม Windows',
+    hooksOn: 'ติดตั้ง hooks ของ Claude Code แล้ว', hooksOff: 'ติดตั้ง hooks ของ Claude Code', hooksRemove: 'ถอนการติดตั้ง hooks ของ Claude Code', forget: 'ล้างประวัติสนทนา', quit: 'ออกจากโปรแกรม',
+    sync: (percent, stage) => `ความผูกพัน: ${percent}% · ${stage}`, stages: ['เพิ่งรู้จัก', 'เริ่มคุ้นเคย', 'เข้ากันได้', 'ผูกพัน', 'เป็นหนึ่งเดียว'],
+    reminders: 'การแจ้งเตือน', noReminders: 'ยังไม่มีรายการ (ตั้งได้ในแชต)', cancelReminder: 'ยกเลิกการแจ้งเตือนนี้', follow: 'ตามฉันข้ามหน้าจอ', jealous: 'แสดงอาการหึง AI อื่น',
+    lookNow: 'ดูหน้าจอของฉัน', lookAuto: 'ดูหน้าจอเป็นครั้งคราว', pcReact: 'ตอบสนองต่อสถานะเครื่อง', cloudFree: 'ฟรี ออนไลน์', cloudSignin: 'เข้าสู่ระบบ Ollama (โมเดลคลาวด์ฟรี)…',
+  },
   fr: {
-    name: 'Français',
+    name: 'Français', character: 'Personnage',
     online: (port) => `Capri — à l'écoute sur ${port}`,
     teleport: 'Téléporter', satellite: 'Regarder le satellite', demo: 'Lancer la démo', help: 'Comment ça marche ?',
     report: 'Rapport de mission', talk: 'Lui parler', custom: 'La personnaliser…', chatModel: 'Modèle IA', aiSetup: 'Choisir avec elle…', apiKey: 'Clé API ou adresse…', noOllama: 'Ollama introuvable',
@@ -26,7 +40,7 @@ const TRAY = {
     cloudFree: 'gratuit, en ligne', cloudSignin: 'Me connecter à Ollama (modèles cloud gratuits)…',
   },
   en: {
-    name: 'English',
+    name: 'English', character: 'Character',
     online: (port) => `Capri — listening on ${port}`,
     teleport: 'Teleport', satellite: 'Look at the satellite', demo: 'Play demo', help: 'How does it work?',
     report: 'Mission report', talk: 'Talk to her', custom: 'Make her yours…', chatModel: 'AI model', aiSetup: 'Set it up with her…', apiKey: 'API key or address…', noOllama: 'Ollama not found',
@@ -47,7 +61,7 @@ const TRAY = {
     cloudFree: 'free, online', cloudSignin: 'Sign in to Ollama (free cloud models)…',
   },
   es: {
-    name: 'Español',
+    name: 'Español', character: 'Personaje',
     online: (port) => `Capri — escuchando en ${port}`,
     teleport: 'Teletransportar', satellite: 'Mirar el satélite', demo: 'Ver la demo', help: '¿Cómo funciona?',
     report: 'Informe de misión', talk: 'Hablar con ella', custom: 'Personalizarla…', chatModel: 'Modelo de IA', aiSetup: 'Elegir con ella…', apiKey: 'Clave API o dirección…', noOllama: 'Ollama no encontrado',
@@ -68,7 +82,7 @@ const TRAY = {
     cloudFree: 'gratis, en línea', cloudSignin: 'Conectarme a Ollama (modelos en la nube gratis)…',
   },
   pt: {
-    name: 'Português (Brasil)',
+    name: 'Português (Brasil)', character: 'Personagem',
     online: (port) => `Capri — ouvindo na porta ${port}`,
     teleport: 'Teletransportar', satellite: 'Olhar o satélite', demo: 'Ver a demo', help: 'Como funciona?',
     report: 'Relatório de missão', talk: 'Falar com ela', custom: 'Personalizar…', chatModel: 'Modelo de IA', aiSetup: 'Escolher com ela…', apiKey: 'Chave de API ou endereço…', noOllama: 'Ollama não encontrado',
@@ -89,7 +103,7 @@ const TRAY = {
     cloudFree: 'grátis, online', cloudSignin: 'Entrar no Ollama (modelos na nuvem grátis)…',
   },
   ru: {
-    name: 'Русский',
+    name: 'Русский', character: 'Персонаж',
     online: (port) => `Capri — слушаю порт ${port}`,
     teleport: 'Телепортироваться', satellite: 'Посмотреть на спутник', demo: 'Запустить демо', help: 'Как это работает?',
     report: 'Отчёт о миссиях', talk: 'Поговорить с ней', custom: 'Настроить её…', chatModel: 'ИИ-модель', aiSetup: 'Выбрать вместе с ней…', apiKey: 'API-ключ или адрес…', noOllama: 'Ollama не найдена',

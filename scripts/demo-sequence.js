@@ -9,6 +9,11 @@ const SESSION = 'demo-session';
 const CWD = 'C:/Users/you/projects/night-city-api';
 
 const TEXT = {
+  th: {
+    prompt: 'เพิ่ม endpoint /gigs พร้อมการแบ่งหน้าและการทดสอบ',
+    explore: 'ตรวจเส้นทางอื่น', test: 'รันการทดสอบ gigs', push: 'ส่งการเปลี่ยนแปลงขึ้น main',
+    reply: 'เพิ่ม **GET /gigs** พร้อมการแบ่งหน้าแบบ cursor แล้ว การทดสอบผ่าน 6 ข้อ และส่งการเปลี่ยนแปลงแล้ว',
+  },
   fr: {
     prompt: 'Ajoute un endpoint /gigs avec pagination et des tests',
     explore: 'Vérifier les autres routes',

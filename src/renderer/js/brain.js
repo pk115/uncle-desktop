@@ -36,7 +36,7 @@ export class Brain {
   }
 
   get t() {
-    return linesFor(this.lang, this.assistant);
+    return linesFor(this.lang, this.assistant, this.character);
   }
 
   // the assistant she watches, as she calls it

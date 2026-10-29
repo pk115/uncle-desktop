@@ -68,7 +68,8 @@ class Small {
     const dpr = window.devicePixelRatio || 1;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, this.w, this.h);
-    this.draw(now, Math.floor(now / STEP));
+    if (this.portrait) this.ctx.drawImage(this.portrait, 18, 32, 104, 104);
+    else this.draw(now, Math.floor(now / STEP));
   }
 
   // it lands as a white silhouette, one drawing, like her impact frames

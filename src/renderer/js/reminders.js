@@ -61,6 +61,26 @@ function unitMs(unit) {
 
 // When, read off text: { at (ms), spans: the parts of the text that said it }, or null.
 export function parseWhen(text, now = Date.now()) {
+  // Thai does not separate words with spaces; match its time expressions directly.
+  const thaiNumber = (s) => Number(s.replace(/[๐-๙]/g, (d) => '๐๑๒๓๔๕๖๗๘๙'.indexOf(d)));
+  const relative = /(?:อีก|ใน)\s*([0-9๐-๙]+(?:\.[0-9๐-๙]+)?)\s*(ชั่วโมง|นาที|วินาที)(?:\s*(?:กับ|และ)?\s*([0-9๐-๙]+)\s*(นาที|วินาที))?/.exec(text);
+  if (relative) {
+    const units = { ชั่วโมง: 3600000, นาที: 60000, วินาที: 1000 };
+    const ms = thaiNumber(relative[1]) * units[relative[2]] + (relative[3] ? thaiNumber(relative[3]) * units[relative[4]] : 0);
+    return ms > 0 ? { at: now + ms, spans: [relative] } : null;
+  }
+  const half = /(?:อีก|ใน)\s*ครึ่งชั่วโมง/.exec(text);
+  if (half) return { at: now + 1800000, spans: [half] };
+  const thaiTime = /(?:เวลา|ตอน)\s*([0-9๐-๙]{1,2})(?:[:.]([0-9๐-๙]{2})|\s*โมง)(?:\s*นาฬิกา)?/.exec(text);
+  if (thaiTime) {
+    const h = thaiNumber(thaiTime[1]), min = thaiNumber(thaiTime[2] || '0');
+    if (h > 23 || min > 59) return null;
+    const at = new Date(now);
+    at.setHours(h, min, 0, 0);
+    const tomorrow = /พรุ่งนี้/.exec(text);
+    if (tomorrow || at.getTime() <= now) at.setDate(at.getDate() + 1);
+    return { at: at.getTime(), spans: [thaiTime, ...(tomorrow ? [tomorrow] : [])] };
+  }
   let m = IN_HM.exec(text);
   if (m) return { at: now + (Number(m[1]) * 60 + Number(m[2])) * 60000, spans: [m] };
   m = IN.exec(text);
@@ -121,13 +141,13 @@ export function parseWhen(text, now = Date.now()) {
 // A reminder asked for in text: { at (ms, or null if it doesn't say when), text: what to remind
 // you of ('' if nothing) }, or null if it isn't asking for one.
 export function parseReminder(text, now = Date.now()) {
-  const trigger = TRIGGER.exec(text);
+  const trigger = /(?:ช่วย)?(?:ตั้งแจ้งเตือน|ตั้งเตือน|แจ้งเตือน|เตือนฉัน|เตือนผม|เตือนด้วย|เตือน)/.exec(text) || TRIGGER.exec(text);
   if (!trigger) return null;
   const when = parseWhen(text, now);
   let what = text;
   for (const m of [trigger, ...(when?.spans || [])]) what = what.replace(m[0], ' ');
   what = what.replace(PM, ' ').replace(AM, ' ').replace(TOMORROW, ' ').replace(POLITE, ' ');
-  what = what.replace(/\s+/g, ' ').replace(LEAD, '').replace(/[\s,;:.!?]+$/, '').trim().slice(0, 140);
+  what = what.replace(/\s+/g, ' ').replace(LEAD, '').replace(/^\s*(?:ให้|ว่า|เรื่อง)\s*/, '').replace(/\s*(?:ด้วยนะ|ด้วย|นะครับ|นะคะ|ครับ|ค่ะ)\s*$/, '').replace(/[\s,;:.!?]+$/, '').trim().slice(0, 140);
   const at = when && when.at - now >= 5000 && when.at - now <= MAX_MS ? when.at : null;
   return { at, text: what };
 }

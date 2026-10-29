@@ -1,5 +1,5 @@
 import { Capri } from './capri.js';
-import { FxLayer, GRAB_FRAMES } from './fx.js';
+import { FxLayer } from './fx.js';
 import { Chip, Mask } from './chip.js';
 import { Panel } from './panel.js';
 import { Voice } from './voice.js';
@@ -9,6 +9,7 @@ import { Mission } from './mission.js';
 import { Chat } from './chat.js';
 import { Setup } from './setup.js';
 import { Custom } from './custom.js';
+import { CharacterPicker } from './character-picker.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
 import { Look } from './look.js';
@@ -17,6 +18,7 @@ import { linesFor } from './lines.js';
 import { pick, fmt, reducedMotion } from './util.js';
 
 const host = window.host;
+const characterAsset = (character, key) => character.custom ? character[key] : `../../assets/characters/${character[key]}`;
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -27,8 +29,6 @@ function loadImage(src) {
   });
 }
 
-// close-ups of her for the cut-ins, frames of the show (tools/build-cutins.py)
-const CUTINS = ['grin', 'laugh', 'eyes', 'many', 'look'];
 const WATCH_MS = 2000; // how often she checks the pointer still reaches her
 const FOLLOW_AFTER = 2; // checks in a row with the pointer on another screen before she follows it there
 const AWAY_MS = 15 * 60 * 1000; // the pointer still this long: you were away from your PC
@@ -38,15 +38,14 @@ const SNOOZE_MS = 10 * 60 * 1000;
 const mine = (cfg) => ({ userName: cfg.userName || '', persona: cfg.persona || '', myLines: cfg.myLines || [], memories: cfg.memories || [] });
 
 async function boot() {
-  const [config, image, intro, ...cutins] = await Promise.all([
-    host.getConfig(),
-    loadImage('../../assets/capri/capri-full.png'),
-    // her intro: her close-up grabbing the screen, and its drawings with her mouth and arm moving
-    Promise.all(GRAB_FRAMES.map((name) => loadImage(`../../assets/capri/intro-${name}.webp`).catch(() => null)))
-      // decoded now, not the first time each one shows up (a hitch right on "hi", on the wave)
-      .then((cels) => Promise.all(cels.map((cel) => cel && createImageBitmap(cel))))
-      .then((cels) => (cels[0] ? Object.fromEntries(GRAB_FRAMES.map((name, i) => [name, cels[i]])) : null)),
-    ...CUTINS.map((name) => loadImage(`../../assets/capri/cutin-${name}.png`)),
+  const config = await host.getConfig();
+  let picker = null;
+  const loadCharacter = (character) => Promise.all([
+    loadImage(characterAsset(character, 'atlas')),
+    loadImage(characterAsset(character, 'portrait')),
+  ]);
+  const [image, portrait] = await loadCharacter(config.character);
+  await Promise.all([
     document.fonts.load('600 16px "Chakra Petch"'),
     document.fonts.load('400 11px "JetBrains Mono"'),
   ]);
@@ -59,10 +58,7 @@ async function boot() {
   applyMotion(config.motion);
   reducedMotion.onSystemChange(() => applyMotion(reducedMotion.setting));
 
-  const fx = new FxLayer(document.getElementById('fx'), {
-    cutins: Object.fromEntries(CUTINS.map((name, i) => [name, cutins[i]])),
-    intro,
-  });
+  const fx = new FxLayer(document.getElementById('fx'), { cutins: {}, intro: null });
   fx.resize(innerWidth, innerHeight);
   // how far the top of the taskbar is from the bottom of her window: she covers it too while she
   // rests on it (the floor she stands on stays its top)
@@ -70,6 +66,7 @@ async function boot() {
   const chip = new Chip(document.getElementById('chip'));
   chip.place(innerWidth, innerHeight - floorGap);
   const mask = new Mask(document.getElementById('mask'));
+  chip.portrait = mask.portrait = config.character.renderer === 'capri' ? null : portrait;
 
   const voice = new Voice();
   voice.configure(config);
@@ -78,13 +75,14 @@ async function boot() {
   const panel = new Panel({
     panel: document.getElementById('panel'),
     ticker: document.getElementById('ticker'),
-    labels: linesFor(config.lang, config.assistant),
+    labels: linesFor(config.lang, config.assistant, config.character),
   });
 
   const capri = new Capri({
     root: document.getElementById('capri'),
     canvas: document.getElementById('sprite'),
     image,
+    character: config.character,
     fx,
     voice,
   });
@@ -96,6 +94,26 @@ async function boot() {
 
   const mission = new Mission();
   const brain = new Brain({ capri, panel, voice, host, mission, lang: config.lang, assistant: config.assistant });
+  brain.character = config.character;
+  const identify = (character) => {
+    const base = `../../assets/characters/${character.id}/`;
+    panel.characterPortraits = character.renderer === 'capri' ? null : {
+      default: base + 'portrait.png',
+      grin: base + 'success.png', laugh: base + 'success.png',
+      aside: base + 'thinking.png', look: base + 'thinking.png',
+      angry: base + 'error.png', worry: base + 'error.png',
+      many: base + 'attention.png',
+    };
+    if (character.custom) panel.characterPortraits = Object.fromEntries(Object.keys(panel.characterPortraits).map((key) => [key, character.portrait]));
+    panel.el.querySelector('.panel__who').textContent = character.name;
+    panel.portrait.alt = character.name;
+    panel.setFace('calm');
+    document.title = character.name + ' · Desktop Companion';
+    document.getElementById('sprite').setAttribute('aria-label', character.name);
+    document.getElementById('chip').setAttribute('aria-label', character.name);
+    document.getElementById('mask').setAttribute('aria-label', character.name);
+  };
+  identify(config.character);
 
   // Click-through everywhere except on her body, the panel and her biochip.
   let interactive = false;
@@ -107,6 +125,7 @@ async function boot() {
   };
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
+    if (picker?.open) return setInteractive(true);
     if (capri.dragging) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
@@ -222,6 +241,48 @@ async function boot() {
   const guide = new Guide({ capri, panel, voice, host, brain });
   // Talking to her (chat.js): "Talk to her" in her menu, or the button when you click her idle.
   const chat = new Chat({ capri, panel, voice, host, brain });
+  let characterRequest = 0;
+  const switchCharacter = async (character) => {
+    const request = ++characterRequest;
+    if (character.id === capri.character.id) return;
+    try {
+      const [nextImage, nextPortrait] = await loadCharacter(character);
+      if (request !== characterRequest) return;
+      chat.close();
+      guide.answer(null);
+      if (panel.current?.kind !== 'alert') panel.hide();
+      capri.setCharacter(nextImage, character);
+      brain.character = character;
+      panel.labels = brain.t;
+      chip.portrait = mask.portrait = character.renderer === 'capri' ? null : nextPortrait;
+      identify(character);
+      picker?.setCurrent(character.id);
+      chat.history = [];
+      chat.waitingWhen = null;
+      // No reload: active coding sessions, position, scale and in-flight reactions survive.
+    } catch (err) {
+      if (request !== characterRequest) return;
+      console.error('[companion] character load failed', err);
+      host.setConfig({ characterId: capri.character.id });
+      panel.say({ kind: 'error', line: brain.lang === 'th' ? 'โหลดตัวละครไม่สำเร็จ ใช้ตัวเดิมต่อ' : 'Could not load character; keeping the current one.', hold: 5000 });
+    }
+  };
+  picker = new CharacterPicker({
+    host,
+    root: document.getElementById('character-picker'),
+    characters: config.characters, currentId: config.characterId, lang: config.lang,
+    onChoose: async (characterId) => {
+      const cfg = await host.setConfig({ characterId });
+      await switchCharacter(cfg.character);
+      if (capri.character.id !== characterId) throw new Error('Character unavailable');
+    },
+    onVisibility: (open) => {
+      capri.pickerOpen = open;
+      host.focusOverlay(open);
+      if (open) setInteractive(true);
+      else refreshHit();
+    },
+  });
   brain.onTalk = () => chat.start();
   // Getting her chat going with buttons (setup.js): Ollama and a model, a key, or an address
   const setup = new Setup({ guide, panel, host, brain, capri, voice });
@@ -501,7 +562,7 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
-  window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, screens: () => screens };
+  window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
   host.onWindows((data) => {
@@ -592,6 +653,7 @@ async function boot() {
   });
 
   host.onConfig((cfg) => {
+    picker?.setCharacters(cfg.characters);
     voice.configure(cfg);
     jealousy.enabled = cfg.jealous !== false;
     followOn = cfg.follow !== false;
@@ -617,18 +679,22 @@ async function boot() {
     brain.watching = cfg.claude !== false;
     brain.custom = mine(cfg);
     brain.assistant = cfg.assistant;
-    panel.labels = linesFor(cfg.lang, cfg.assistant);
+    panel.labels = linesFor(cfg.lang, cfg.assistant, brain.character);
+    switchCharacter(cfg.character);
     if (cfg.scale !== capri.scale) capri.setScale(cfg.scale);
     if (cfg.lang !== brain.lang) {
-      brain.lang = cfg.lang;
-      panel.labels = linesFor(cfg.lang, cfg.assistant);
-      document.documentElement.lang = cfg.lang;
+      // Recreate open guides and chat controls too, so no old-language buttons remain.
+      window.location.reload();
+      return;
     }
   });
 
   host.onCommand(async (cmd) => {
     const t = brain.t;
     switch (cmd.name) {
+      case 'characters':
+        picker.show();
+        break;
       case 'teleport':
         capri.teleport(capri.spot('random'));
         break;
@@ -676,7 +742,7 @@ async function boot() {
         host.rearm();
         break;
       case 'loseGl': { // --dev: as if the GPU had been reset (waking from sleep): she goes, then comes back
-        const lose = capri.sprite.gl.getExtension('WEBGL_lose_context');
+        const lose = capri.sprite.gl?.getExtension('WEBGL_lose_context');
         lose?.loseContext();
         setTimeout(() => lose?.restoreContext(), cmd.ms ?? 1500);
         break;
@@ -784,7 +850,6 @@ async function boot() {
   // entrance: her face big in the corner says hi, then she dives down to her spot
   // (put away last time: she starts in her biochip)
   if (config.visible === false) capri.stowNow();
-  else if (intro) await capri.intro(capri.spot('post'));
   else await capri.materialize(capri.spot('post'));
   // Windows has its animations off and she's following it: she barely moves. The first time, she
   // says so and asks whether to move anyway (her menu › Animations changes it later).

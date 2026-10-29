@@ -52,6 +52,25 @@
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 
+@font-face {
+  font-family: 'Chakra Petch Thai';
+  src: url('../../../node_modules/@fontsource/chakra-petch/files/chakra-petch-thai-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch Thai';
+  src: url('../../../node_modules/@fontsource/chakra-petch/files/chakra-petch-thai-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch Thai';
+  src: url('../../../node_modules/@fontsource/chakra-petch/files/chakra-petch-thai-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   /* palette sampled from the show */
   --ink: oklch(0.17 0.035 300);
@@ -64,8 +83,8 @@
   --violet: oklch(0.55 0.255 292);
   --blue: oklch(0.6 0.2 260);
 
-  --font-display: 'Chakra Petch', 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --font-display: 'Chakra Petch', 'Chakra Petch Thai', 'Leelawadee UI', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Chakra Petch Thai', 'Leelawadee UI', ui-monospace, Consolas, monospace;
 
   --text-line: clamp(15px, calc(0.45vw + 8.5px), 19px);
   --text-meta: 10px;
@@ -79,6 +98,24 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Keep Thai vowel/tone marks intact and give stacked marks enough height. */
+html:lang(th) .panel__line,
+html:lang(th) .panel__quote,
+html:lang(th) .panel__reply,
+html:lang(th) .panel__actions button,
+html:lang(th) input,
+html:lang(th) textarea {
+  line-height: 1.65;
+  letter-spacing: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+html:lang(th) .panel__meta,
+html:lang(th) .ticker {
+  letter-spacing: normal;
+  line-height: 1.6;
 }
 
 html,

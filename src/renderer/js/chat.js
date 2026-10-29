@@ -16,6 +16,7 @@ const KEEP = 60;     // messages she remembers across restarts (memory.json)
 // `now`: the same, said again right by your message (small models answer in the language of the
 // conversation so far, English after a switch, whatever the top of her prompt says)
 const IN_LANGUAGE = {
+  th: { we: '"พวกเรา" in Thai', last: 'ตอบเป็นภาษาไทยที่เป็นธรรมชาติ เว้นแต่ผู้ใช้เขียนภาษาอื่น ให้ตอบตามภาษาของผู้ใช้ คงชื่อโปรแกรม ชื่อไฟล์ และโค้ดตามต้นฉบับ', now: 'ตอบเป็นภาษาไทย เว้นแต่ข้อความนี้เขียนเป็นภาษาอื่น' },
   fr: { we: '"on" or "nous" in French', last: 'Écris tout en français, sauf si l’utilisateur t’écrit dans une autre langue : alors dans la sienne. Seuls les mots d’argot de Night City restent en anglais, jamais une phrase entière.', now: 'Réponds en français, sauf si ce message est écrit dans une autre langue.' },
   en: { we: '', last: 'Write everything in English, unless the user writes to you in another language: then in theirs.', now: 'Answer in English, unless this message is written in another language.' },
   es: { we: '"nosotros" in Spanish', last: 'Escribe todo en español, salvo si el usuario te escribe en otro idioma: entonces en el suyo. Solo las palabras de jerga de Night City se quedan en inglés, nunca una frase entera.', now: 'Responde en español, salvo si este mensaje está escrito en otro idioma.' },
@@ -26,11 +27,11 @@ const STAY_MS = 10 * 60 * 1000; // no wandering off mid-conversation
 const LOADING_AFTER_MS = 5000;
 const CLOSE_TAG = /\[\[\s*close\s*:?\s*([^\]]*)\]\]/i; // [[close: AM Music]] at the end of her answer
 // "close", "shut down", "ferme", "quitte", "cierra", "fecha", "закрой"... in any of her languages
-const CLOSE_ASK = /\b(close|shut|quit|kill|exit)|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|закр|выключ/i;
+const CLOSE_ASK = /\b(close|shut|quit|kill|exit)|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|закр|выключ|ปิด(?:แอป|โปรแกรม|หน้าต่าง)?/i;
 // her other tags: [[open: Spotify]], [[music: Bad Bunny]], [[media: next]], [[site: youtube.com]]
 const TAG = /\[\[\s*(open|music|media|site)\s*:\s*([^\]]*)\]\]/i;
 // "open", "launch", "ouvre", "lance", "abre", "открой"... in any of her languages
-const OPEN_ASK = /\b(open|launch|start|run)\b|ouvr|lance|démarre|abre|abrir|inicia|ejecuta|executa|открой|запусти/i;
+const OPEN_ASK = /\b(open|launch|start|run)\b|ouvr|lance|démarre|abre|abrir|inicia|ejecuta|executa|открой|запусти|เปิด(?:แอป|โปรแกรม)?|เริ่มโปรแกรม/i;
 // what to do with the music playing, said plainly (only when it's about music, or said in a few words)
 const MEDIA_ASK = [
   ['pause', /\b(pause|pausa|pausar)\b|stop (the )?music|arrête la musique|пауз/i],
@@ -41,7 +42,7 @@ const MEDIA_ASK = [
   ['voldown', /\b(quieter|moins fort)\b|baisse le son|turn (it )?down|baja el volumen|abaixa o volume|тише/i],
   ['mute', /\bmute\b|coupe le son|silencia|sem som|выключи звук/i],
 ];
-const MUSIC_WORD = /musi|chanson|song|track|titre|morceau|spotify|canci|faixa|песн|музык|трек/i;
+const MUSIC_WORD = /musi|chanson|song|track|titre|morceau|spotify|canci|faixa|песн|музык|трек|เพลง|ดนตรี/i;
 // "put X on Spotify", "mets X sur Spotify", "pon X en Spotify", "coloca X no Spotify", "включи X в Spotify"
 const SPOTIFY_ASK = /(?:play|put on|put|mets|joue|lance|écoute|pon|toca|reproduce|coloca|toque|включи|поставь)\s+(?:moi\s+|me\s+)?(.+?)\s+(?:on|sur|en|no|na|в)\s+spotify/i;
 const MEDIA_ACTIONS = new Set(MEDIA_ASK.map(([action]) => action));
@@ -126,7 +127,7 @@ const SOUND = /\b(sound|volume|volumen)\b|\b(le|du|au) son\b|\bo som\b|звук|
 const PLAY = /\bjou(er|e)\b|\bplay\b|jugar|juega|jogar|joga|играть|поигра/i;
 const SITE = /\b(site|web|page|lien|link|url|enlace|p[aá]gina)|сайт|ссылк|\.(com|fr|org|net|io|gg|tv|be|ch|ca|es|br|pt|ru)\b/i;
 // "appelle-moi Max", "call me Max", "llámame Max", "me chama de Max", "зови меня Макс"
-const NAME_ASK = /(?:appelle[- ]moi|call me|my name is|je m['’]appelle|ll[aá]mame|me llamo|me cham[ae] de|meu nome [eé]|зови меня|меня зовут)\s+([\p{L}\p{N}'’-]{1,24})/iu;
+const NAME_ASK = /(?:appelle[- ]moi|call me|my name is|je m['’]appelle|ll[aá]mame|me llamo|me cham[ae] de|meu nome [eé]|зови меня|меня зовут|เรียกฉันว่า|เรียกผมว่า|ฉันชื่อ|ผมชื่อ)\s*([\p{L}\p{M}\p{N}'’-]{1,24})/iu;
 // "souviens-toi que…", "remember that…", "recuerda que…", "lembra que…", "запомни, что…" (said first thing)
 const MEMO_ASK = /^\s*(?:capri,?\s+|stp,?\s+|please,?\s+)?(?:souviens[- ]toi(?: que| de)?|n['’]oublie pas(?: que| de)?|remember(?: that)?|recuerda(?: que)?|lembr[ae](?:-se)?(?: que| de)?|запомни,?(?: что)?)\s+(.{3,200})/iu;
 const MEMORIES_MAX = 30;
@@ -386,7 +387,7 @@ export class Chat {
   remember(message) {
     this.history.push(message);
     this.history = this.history.slice(-KEEP);
-    this.host.chatRemember(this.history);
+    this.host.chatRemember(this.history, this.brain.character?.id);
   }
 
   listApps() {
@@ -396,6 +397,7 @@ export class Chat {
   // What you asked plainly, read off your message (a small model doesn't always write its tag right):
   // { kind: 'media', action } | { kind: 'music', song } | { kind: 'close', name } | { kind: 'open', text }
   asked(text) {
+    if (/^\s*(?:ไม่ต้อง|อย่า|ห้าม)/.test(text)) return null;
     const count = text.trim().split(/\s+/).length;
     if (this.reminders) {
       const remind = parseReminder(text);
@@ -407,6 +409,19 @@ export class Chat {
     }
     const name = NAME_ASK.exec(text)?.[1];
     if (name) return { kind: 'name', name };
+    const thai = text.trim().replace(/^(?:ช่วย|กรุณา)\s*/, '').replace(/\s*(?:ด้วยนะ|ด้วย|นะครับ|นะคะ|ครับ|ค่ะ)\s*$/, '');
+    const memory = /^(?:จำไว้ว่า|จำว่า|ช่วยจำว่า)\s*(.{1,200})$/u.exec(thai);
+    if (memory) return { kind: 'memo', text: memory[1] };
+    if (/^(?:ดูหน้าจอ(?:ของ)?(?:ฉัน|ผม)?|ดูจอ(?:ให้หน่อย)?|บนจอมีอะไร|เห็นอะไรบนจอ)$/.test(thai)) return { kind: 'look' };
+    if (/^(?:ถ่ายภาพหน้าจอ|จับภาพหน้าจอ|แคปหน้าจอ)$/.test(thai)) return { kind: 'shot' };
+    const thaiMedia = { 'หยุดเพลง': 'pause', 'พักเพลง': 'pause', 'เพลงถัดไป': 'next', 'ข้ามเพลง': 'next', 'เพลงก่อนหน้า': 'previous', 'เล่นเพลงต่อ': 'play', 'เพิ่มเสียง': 'volup', 'ลดเสียง': 'voldown', 'ปิดเสียง': 'mute' }[thai];
+    if (thaiMedia) return { kind: 'media', action: thaiMedia };
+    const thaiSong = /^(?:เปิดเพลง|เล่นเพลง)\s*(.+?)\s*(?:บน|ใน)\s*(Spotify|YouTube)$/i.exec(thai);
+    if (thaiSong) return { kind: thaiSong[2].toLowerCase() === 'spotify' ? 'music' : 'youtube', song: thaiSong[1] };
+    const thaiPlay = /^(?:เปิดเพลง|เล่นเพลง)\s*(.{2,100})$/.exec(thai);
+    if (thaiPlay) return { kind: 'play', song: thaiPlay[1] };
+    const thaiSearch = /^(?:ค้นหา|ค้น)\s*(.+?)\s*(?:บน|ใน)\s*(?:Google|กูเกิล|เว็บ)$/i.exec(thai);
+    if (thaiSearch) return { kind: 'web', query: thaiSearch[1] };
     const memo = MEMO_ASK.exec(text)?.[1]?.trim();
     if (memo) return { kind: 'memo', text: memo };
     if (this.look && LOOK_ASK.test(text)) return { kind: 'look' };
@@ -783,8 +798,7 @@ export class Chat {
   lookPersona() {
     const lang = IN_LANGUAGE[this.brain.lang] || IN_LANGUAGE.en;
     return [
-      `You are Capri, the personality construct from Project Capricorn (Cyberpunk: Edgerunners, season 2): dozens of minds fused into one digital ghost, living on the user's desktop as a small glitchy figure.`,
-      'How you talk: playful, a little mischievous and teasing, warm underneath, never cruel. Night City slang now and then (choom, preem, nova, gonk), not in every sentence.',
+      this.brain.character?.personality || 'You are Capri, a playful desktop companion.',
       'Rules: one or two short sentences of plain text, no markdown, no lists, no emoji, no tags. Stay in character. Talk to the user, never describe the picture like a report.',
       'Never read out anything private you might see (passwords, bank details, private messages, addresses): if there is some, just tease them about being busy.',
       ...this.personal(),
@@ -800,17 +814,16 @@ export class Chat {
     const watching = this.brain.watching; // else Claude Code isn't part of her life here
     const lang = IN_LANGUAGE[this.brain.lang] || IN_LANGUAGE.en;
     return [
-      `You are Capri, the personality construct from Project Capricorn (Cyberpunk: Edgerunners, season 2): dozens of minds fused into one digital ghost, so now and then you speak as "we"${lang.we ? ` (${lang.we})` : ''}.`,
+      this.brain.character?.personality || `You are Capri, a playful desktop companion${lang.we ? ` who sometimes says ${lang.we}` : ''}.`,
       watching
         ? `You live on the user's desktop as a small glitchy figure and keep an eye on ${assistant}, their AI coding assistant, for them. Only talk about ${assistant} when the user asks about it or about their work.`
         : 'You live on the user\'s desktop as a small glitchy figure and keep them company.',
       `Right now it's ${new Intl.DateTimeFormat('en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())}, the user's time.`,
-      'You love the satellite that crosses the night sky and dream of reaching it, but bring it up only once in a while, never in every answer. Talk about what the user talks about.',
-      'How you talk: playful, a little mischievous and teasing, warm underneath, never cruel. Night City slang now and then (choom, preem, nova, gonk, flatline), not in every sentence.',
+      'Talk about what the user talks about. Be warm and helpful; never cruel.',
       'Rules: keep it short, one to three sentences of plain text, no markdown, no lists, no emoji. Stay in character.',
-      'You are an AI-generated fan version of the character, not the real one: say so if asked.',
+      'You are an AI-powered desktop version of a game character: say so if asked.',
       // a big model asked "who are you?" otherwise answers with its own name ("I'm Gemini")
-      ...(this.agent ? [] : ['Asked who or what you are, you are Capri, nothing else. Never say which AI model or company is behind you (Gemini, GPT, ChatGPT, Llama, Gemma, Mistral, Google, OpenAI, Meta…), even if the user insists or names one: you are not them.']),
+      ...(this.agent ? [] : [`If asked who you are, introduce yourself as ${this.brain.character?.name || 'Capri'}, the desktop companion. Do not pretend to be the model provider.`]),
       ...this.personal(),
       // how close she is to them by now, and the other AIs they used today
       ...(this.bond ? [this.bond.persona()] : []),
@@ -864,11 +877,11 @@ function tagged(text) {
   return name || null;
 }
 
-const simple = (text) => String(text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+const simple = (text) => String(text || '').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '');
 
 // Her face for an answer.
 export function mood(text) {
-  if (/(ha){2,}|lol|mdr|jaja|kkk|хаха/i.test(text)) return 'laugh';
+  if (/(ha){2,}|lol|mdr|jaja|kkk|хаха|555|ฮ่า|ฮาๆ/i.test(text)) return 'laugh';
   if (text.includes('!')) return 'grin';
   if (text.trim().endsWith('?')) return 'smug';
   return 'look';

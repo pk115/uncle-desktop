@@ -1,6 +1,8 @@
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+export const graphemes = (text) => Array.from(graphemeSegmenter.segment(text), ({ segment }) => segment);
 export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -33,6 +35,11 @@ export const fmt = (str, vars = {}) => str.replace(/\{(\w+)\}/g, (_, k) => (vars
 export function duration(ms, lang = 'fr') {
   const ru = lang === 'ru';
   const s = Math.max(0, Math.round(ms / 1000));
+  if (lang === 'th') {
+    if (s < 60) return `${s} วินาที`;
+    if (s < 3600) return `${Math.floor(s / 60)} นาที ${s % 60} วินาที`;
+    return `${Math.floor(s / 3600)} ชั่วโมง ${Math.floor(s / 60) % 60} นาที`;
+  }
   if (s < 60) return ru ? `${s} с` : `${s} s`;
   const m = Math.floor(s / 60);
   const ss = String(s % 60).padStart(2, '0');

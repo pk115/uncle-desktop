@@ -1,0 +1,8 @@
+{
+  "generator": "built-in ImageGen",
+  "intent": "Pinky pastel pink, no tears or blue cheek marks",
+  "prompt": "Edit reference 1 ORIGINAL Pinky atlas, preserving its exact 1024x1536 dimensions, 4 columns x 6 rows, exact 24 poses and character identity. Reference 2 is ONLY color guidance: use pale pastel pink of character skin inside red rectangle, not the dark saturated pink background or red border. Main fur #F4AEC8 with #F8C9DB highlights, gentle muted #D98CA9 shadows; hair and shoes muted light rose. Remove ALL blue cheek dots and ALL tears from BOTH cheeks in ALL 24 frames. Smooth plain pink cheeks, golden eyes and white nose preserved. Do NOT change layout or zoom in. Shrink each character enough to leave generous clear transparent margins on all four sides, at least 15px outer edge and 20px gutters; no hands, ears or feet touch edges or adjacent figures. Absolutely 24 complete isolated figures, each with two arms and two hands, fully visible feet, consistent scale. True transparent background, clean alpha, no colored backdrop, no glow, no speckles or cast shadows. No text. This is a production transparent RGBA sprite sheet, not a poster. Change only color palette and remove cheek dots; preserve original poses and soft 3D toy rendering.",
+  "reference": "User-provided pink swatch; use character skin inside red rectangle",
+  "raw": "exec-39364df2-b4e7-4eee-8221-68e1b50ab3ad.png",
+  "outputs": "assets/characters/pinky/atlas.webp, portrait.png, thinking.png, attention.png, success.png, error.png, sleep.png, preview.jpg"
+}
