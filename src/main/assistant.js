@@ -21,6 +21,12 @@ const PRESETS = {
 const MAIL_QUERY = 'is:unread is:important newer_than:1d';
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
+// the important-mail query, with your VIP senders always counting (unread, from the last day)
+function mailQuery(cfg) {
+  const base = cfg.mailQuery || MAIL_QUERY, vip = (cfg.mailVip || []).filter((v) => /^[\w.@+-]+$/.test(v));
+  return vip.length ? `(${base}) OR (is:unread newer_than:1d from:(${vip.join(' OR ')}))` : base;
+}
+
 // search_emails' text: "ID: …\nSubject: …\nFrom: …\nDate: …" blocks
 function mailsFrom(text) {
   return String(text).split(/\n\s*\n/).map((block) => {
@@ -41,7 +47,9 @@ function eventsFrom(text) {
       if (start && (v.summary !== undefined || v.id)) {
         const meet = v.hangoutLink || v.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri;
         const inLocation = /https?:\/\/\S+/.exec(v.location || '')?.[0];
-        found.push({ id: v.id || `${v.summary}@${start}`, summary: v.summary || '(ไม่มีชื่อ)', start: Date.parse(start), link: meet || inLocation || v.htmlLink || '' });
+        const end = Date.parse(v.end?.dateTime || v.end || '');
+        const attendees = (v.attendees || []).filter((a) => !a.self && a.email).map((a) => a.email).slice(0, 10);
+        found.push({ id: v.id || `${v.summary}@${start}`, summary: v.summary || '(ไม่มีชื่อ)', start: Date.parse(start), end: Number.isFinite(end) ? end : null, attendees, link: meet || inLocation || v.htmlLink || '' });
       } else Object.values(v).forEach(walk);
     }
   };
@@ -49,7 +57,8 @@ function eventsFrom(text) {
   return found.filter((e) => Number.isFinite(e.start));
 }
 
-function createAssistant({ mcp, dir, getConfig, alert, log = () => {}, run = spawn }) {
+// prep(event): a few lines on your recent mail with its attendees, for the alert (meeting prep)
+function createAssistant({ mcp, dir, getConfig, alert, prep = null, log = () => {}, run = spawn }) {
   const keys = path.join(dir, 'google-oauth.json');
   const seenMail = new Set();
   const warned = new Set();
@@ -94,7 +103,7 @@ function createAssistant({ mcp, dir, getConfig, alert, log = () => {}, run = spa
   async function checkMail() {
     const cfg = getConfig();
     if (cfg.mailAlerts === false || !mcp.ready('gmail')) return;
-    const mails = mailsFrom(await mcp.call('gmail', 'search_emails', { query: cfg.mailQuery || MAIL_QUERY, maxResults: 10 }));
+    const mails = mailsFrom(await mcp.call('gmail', 'search_emails', { query: mailQuery(cfg), maxResults: 10 }));
     for (const m of mails) {
       if (seenMail.has(m.id)) continue;
       seenMail.add(m.id);
@@ -107,6 +116,12 @@ function createAssistant({ mcp, dir, getConfig, alert, log = () => {}, run = spa
     if (getConfig().eventAlerts === false || !mcp.ready('calendar')) return;
     const now = new Date();
     events = eventsFrom(await mcp.call('calendar', 'list-events', { calendarId: 'primary', timeMin: now.toISOString(), timeMax: new Date(now.getTime() + 3 * 3600000).toISOString() }, { max: 200000 }));
+    // two meetings at the same time: said once
+    const sorted = [...events].sort((a, b) => a.start - b.start);
+    for (let i = 1; i < sorted.length; i++) {
+      const a = sorted[i - 1], b = sorted[i], key = `${a.id}|${b.id}`;
+      if (a.end && b.start < a.end && !warned.has(key)) { warned.add(key); alert({ kind: 'info', message: `⚠️ นัดชนกัน: "${a.summary}" กับ "${b.summary}"` }); }
+    }
   }
   // each meeting, once, `eventLead` minutes before it starts
   function checkEvents(now = Date.now()) {
@@ -116,8 +131,25 @@ function createAssistant({ mcp, dir, getConfig, alert, log = () => {}, run = spa
     for (const e of events) {
       if (warned.has(e.id) || e.start - now > lead || e.start < now - 60000) continue;
       warned.add(e.id);
-      alert({ kind: 'event', ...e, minutes: Math.max(0, Math.round((e.start - now) / 60000)) });
+      const minutes = Math.max(0, Math.round((e.start - now) / 60000));
+      if (!prep || !e.attendees?.length || !mcp.ready('gmail')) { alert({ kind: 'event', ...e, minutes }); continue; }
+      Promise.race([prep(e), new Promise((r) => setTimeout(() => r(''), 45000).unref?.())]).catch(() => '')
+        .then((notes) => alert({ kind: 'event', ...e, minutes, prep: notes || '' }));
     }
+  }
+
+  async function followUps() {
+    if (getConfig().followUps === false || !mcp.ready('gmail')) return [];
+    const sent = mailsFrom(await mcp.call('gmail', 'search_emails', { query: 'in:sent newer_than:7d older_than:3d', maxResults: 10 }));
+    const waiting = [];
+    for (const m of sent) {
+      const subject = m.subject.replace(/^(re|fwd?):\s*/i, '').replace(/["\\]/g, '').slice(0, 80);
+      if (!subject) continue;
+      const replies = mailsFrom(await mcp.call('gmail', 'search_emails', { query: `subject:"${subject}" -in:sent newer_than:7d`, maxResults: 1 }));
+      if (!replies.length) waiting.push(m);
+    }
+    if (waiting.length) alert({ kind: 'info', message: `📮 ยังไม่มีคนตอบ ${waiting.length} เมลที่คุณส่งไป: ${waiting.map((m) => m.subject).slice(0, 3).join(' · ')} — จะให้ร่างทวงไหม ถามในแชตได้เลย` });
+    return waiting;
   }
 
   function start() {
@@ -128,7 +160,7 @@ function createAssistant({ mcp, dir, getConfig, alert, log = () => {}, run = spa
   }
   const stop = () => timers.forEach(clearInterval);
 
-  return { start, stop, connect, disconnect, useKeys, hasKeys, connected, checkMail, loadEvents, checkEvents, PRESETS };
+  return { start, stop, connect, disconnect, useKeys, hasKeys, connected, checkMail, loadEvents, checkEvents, followUps, PRESETS };
 }
 
-module.exports = { createAssistant, mailsFrom, eventsFrom, PRESETS, MAIL_QUERY };
+module.exports = { createAssistant, mailsFrom, eventsFrom, mailQuery, PRESETS, MAIL_QUERY };

@@ -15,10 +15,14 @@ const HELP = `คุยกับฉันได้เลย:
 /projects รายชื่อโปรเจกต์ · /create ชื่อ [codex] สร้างใหม่ · /project ชื่อ เลือก
 /code โหมดเขียนโค้ด (ข้อความ เสียง รูป ส่งให้ Agent) · /chat กลับมาคุยปกติ
 /diff ดูสิ่งที่แก้ · /commit ข้อความ · /stop หยุด · /shot url ดูหน้าเว็บ
-/pr PIN เปิด pull request · /undo PIN ย้อน commit ล่าสุด`;
+/pr PIN เปิด pull request · /undo PIN ย้อน commit ล่าสุด
+
+🖥 คอม (เปิดได้ในตั้งค่า Telegram ต้องใส่ PIN):
+/screen PIN ดูหน้าจอ · /pc PIN งาน สั่งงานคอม · /lock /sleep /shutdown /restart PIN`;
 
 // coding: her Vibecode (vibe.js, plus shot(url)); checkPin(pin) for the risky ones (PR, undo)
-function createPhone({ telegram, settings, answer, transcribe, speak, media, coding = null, checkPin = () => false, setProject = () => {}, idleSeconds = () => 0, log = () => {} }) {
+// remote: { screen() -> png, pc(task) -> text, power(action) -> text } for the switches screen, control, power
+function createPhone({ telegram, settings, answer, transcribe, speak, media, coding = null, remote = null, checkPin = () => false, setProject = () => {}, idleSeconds = () => 0, log = () => {} }) {
   let mode = 'chat'; // 'code': what you send goes to the project's coding agent
   const history = []; // the last turns with your phone, for follow-ups
   const asks = new Map(); // a tool waiting for your tap: id -> resolve
@@ -84,6 +88,17 @@ function createPhone({ telegram, settings, answer, transcribe, speak, media, cod
     }
   }
 
+  // the computer from your phone: each behind its switch and your PIN ("/screen 1234", "/pc 1234 เปิด Spotify", "/lock 1234")
+  async function remoteCommand(chatId, text) {
+    const [cmd, pin, ...rest] = text.split(/\s+/), sw = settings().switches;
+    const need = { '/screen': 'screen', '/pc': 'control' }[cmd] || 'power';
+    if (!sw[need]) return telegram.send(chatId, `คำสั่งนี้ปิดอยู่ เปิดได้ที่ ตั้งค่า › Telegram บนคอม (${need === 'screen' ? 'ดูหน้าจอ' : need === 'control' ? 'สั่งงานคอม' : 'ปิด/ล็อกเครื่อง'})`);
+    if (!checkPin(pin || '')) return telegram.send(chatId, `ต้องใส่ PIN เช่น ${cmd} 1234${cmd === '/pc' ? ' เปิด Spotify' : ''}`);
+    if (cmd === '/screen') return telegram.sendFile(chatId, 'photo', await remote.screen(), 'screen.jpg', 'image/jpeg', 'หน้าจอตอนนี้');
+    if (cmd === '/pc') return telegram.send(chatId, await remote.pc(rest.join(' ')));
+    return telegram.send(chatId, await remote.power(cmd.slice(1)));
+  }
+
   async function onMessage(m) {
     const { chatId } = m;
     try {
@@ -91,6 +106,8 @@ function createPhone({ telegram, settings, answer, transcribe, speak, media, cod
         const [, id, yes] = /^ask:(\w+):(yes|no)$/.exec(m.data) || [];
         const resolve = asks.get(id);
         if (resolve) { asks.delete(id); resolve(yes === 'yes'); await telegram.send(chatId, yes === 'yes' ? 'อนุญาตแล้ว กำลังทำ…' : 'ไม่ทำนะ'); }
+        const quick = /^m:(s|r|t):(\w{6,40})$/.exec(m.data || '');
+        if (quick) return await reply(chatId, { s: `สรุปเมล id ${quick[2]} ให้หน่อย`, r: `ร่างคำตอบเมล id ${quick[2]} ให้หน่อย ยังไม่ต้องส่ง`, t: `อ่านเมล id ${quick[2]} แล้วเพิ่มสิ่งที่ฉันต้องทำลงรายการงาน` }[quick[1]]);
         if (coding && m.data === 'code:diff') await codeCommand(chatId, '/diff');
         if (coding && m.data === 'code:commit') await codeCommand(chatId, '/commit');
         return;
@@ -99,6 +116,7 @@ function createPhone({ telegram, settings, answer, transcribe, speak, media, cod
       if (m.kind === 'text') {
         if (/^\/(start|help)\b/.test(m.text)) return telegram.send(chatId, HELP);
         if (/^\/new\b/.test(m.text)) { history.length = 0; return telegram.send(chatId, 'เริ่มเรื่องใหม่แล้ว'); }
+        if (remote && /^\/(screen|pc|lock|sleep|shutdown|restart)\b/.test(m.text)) return await remoteCommand(chatId, m.text);
         if (coding && m.text.startsWith('/') && (await codeCommand(chatId, m.text)) !== false) return undefined;
         if (coding && mode === 'code') return await code(chatId, m.text);
         return await reply(chatId, m.text);
@@ -145,7 +163,9 @@ function createPhone({ telegram, settings, answer, transcribe, speak, media, cod
         : alert.kind === 'news' || alert.kind === 'brief' ? `${alert.title}\n${alert.text || ''}${alert.links?.length ? `\n\n${alert.links.map((l) => `• ${l.title}\n${l.link}`).join('\n')}` : ''}`
           : alert.kind === 'agent' ? `🤖 ${alert.message}`
             : `${alert.kind === 'error' ? '⚠️' : '💬'} ${alert.message || alert.text || ''}`;
-    await telegram.send(chatId, text, link ? [[{ text: alert.kind === 'mail' ? 'เปิดเมล' : alert.kind === 'event' ? 'เข้าประชุม' : 'เปิด', url: link }]] : undefined);
+    const quick = alert.kind === 'mail' && /^\w{6,40}$/.test(alert.id || '') ? [[{ text: 'สรุปให้', data: `m:s:${alert.id}` }, { text: 'ร่างตอบ', data: `m:r:${alert.id}` }, { text: 'เพิ่มเป็นงาน', data: `m:t:${alert.id}` }]] : [];
+    const buttons = [...(link ? [[{ text: alert.kind === 'mail' ? 'เปิดเมล' : alert.kind === 'event' ? 'เข้าประชุม' : 'เปิด', url: link }]] : []), ...quick];
+    await telegram.send(chatId, alert.kind === 'event' && alert.prep ? `${text}\n\n${alert.prep}` : text, buttons.length ? buttons : undefined);
   }
 
   return { onMessage, notify, confirm, history, get mode() { return mode; } };

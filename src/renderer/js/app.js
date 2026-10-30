@@ -778,6 +778,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'ask-value') { // a value typed in her panel: VIP senders, a routine, LINE
+      const got = await guide.askText({ face: 'look', line: cmd.title, quote: cmd.hint, secret: Boolean(cmd.secret), placeholder: cmd.value || cmd.hint });
+      if (got?.text === undefined || got?.text === null) return;
+      try { panel.say({ kind: 'info', line: `${cmd.title}: ${await host.setValue(cmd.key, got.text)}`, hold: 6000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 9000 }); }
+      return;
+    }
     if (cmd.name === 'news-list') { // a list in her News tab: topics, alert words, feeds, outlets to skip
       const got = await guide.askText({ face: 'look', line: cmd.title, quote: cmd.hint, placeholder: cmd.value || cmd.hint });
       if (got?.text === undefined || got?.text === null) return;
@@ -804,8 +811,15 @@ async function boot() {
       if (cmd.kind === 'mail' || cmd.kind === 'event') {
         voice.play('remind'); capri.wake();
         const line = cmd.kind === 'mail' ? `📧 เมลสำคัญจาก ${cmd.from.replace(/<[^>]*>/, '').trim() || 'ไม่ทราบชื่อ'}` : `📅 อีก ${cmd.minutes} นาที: ${cmd.summary}`;
-        const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), { id: 'ok', label: 'รับทราบ' }];
-        panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : '', actions, onAction: (id) => { if (id === 'open') host.openSite(link); panel.hide(); }, hold: null });
+        const asks = cmd.kind === 'mail'
+          ? { sum: ['สรุปให้', `สรุปเมล id ${cmd.id} (จาก ${cmd.from}) ให้หน่อย และบอกว่าต้องทำอะไรต่อไหม`], reply: ['ร่างตอบ', `ร่างคำตอบเมล id ${cmd.id} (จาก ${cmd.from}) ให้หน่อย ยังไม่ต้องส่ง`], task: ['เพิ่มเป็นงาน', `อ่านเมล id ${cmd.id} แล้วเพิ่มสิ่งที่ฉันต้องทำลงรายการงาน`] }
+          : { late: ['เลื่อน 15 นาที', `เลื่อนนัด "${cmd.summary}" (event id ${cmd.id}) ออกไป 15 นาที`] };
+        const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), ...Object.entries(asks).map(([id, [label]]) => ({ id, label })), { id: 'ok', label: 'รับทราบ' }];
+        panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : cmd.prep || '', actions, hold: null, onAction: async (id) => {
+          panel.hide();
+          if (id === 'open') host.openSite(link);
+          else if (asks[id]) { await chat.start(); chat.send(asks[id][1]); }
+        } });
       } else if (cmd.kind === 'news' || cmd.kind === 'brief') { // a summary: in her bubble, and aloud if you like
         voice.play('remind'); capri.wake();
         const first = cmd.link || cmd.links?.[0]?.link;

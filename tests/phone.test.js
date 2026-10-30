@@ -44,3 +44,23 @@ test('phone: alerts always, only when away, or never', async () => {
   s = { ...s, notify: 'off' }; await phone.notify({ kind: 'event', minutes: 5, summary: 'x' });
   assert.equal(tg.out.length, 1);
 });
+
+test('phone: the computer from your phone only with its switch on and the PIN; mail quick buttons', async () => {
+  const tg = fakeTelegram(); let sw = { ...on, screen: false, control: true, power: false }; const asked = [];
+  const remote = { screen: async () => Buffer.from('jpg'), pc: async (task) => `เริ่ม ${task}`, power: async (a) => a };
+  const phone = createPhone({ telegram: tg, settings: () => ({ switches: sw, chatId: 1 }), remote, checkPin: (p) => p === '9999',
+    answer: async ({ text }) => { asked.push(text); return 'ok'; }, transcribe: async () => '', speak: async () => null, media: async () => '' });
+  await phone.onMessage({ kind: 'text', text: '/screen 9999', chatId: 1 });
+  assert.match(tg.out.at(-1).text, /ปิดอยู่/);
+  await phone.onMessage({ kind: 'text', text: '/pc 1111 เปิด Spotify', chatId: 1 });
+  assert.match(tg.out.at(-1).text, /PIN/);
+  await phone.onMessage({ kind: 'text', text: '/pc 9999 เปิด Spotify', chatId: 1 });
+  assert.equal(tg.out.at(-1).text, 'เริ่ม เปิด Spotify');
+  sw = { ...sw, screen: true };
+  await phone.onMessage({ kind: 'text', text: '/screen 9999', chatId: 1 });
+  assert.equal(tg.out.at(-1).file, 'photo');
+  await phone.notify({ kind: 'mail', id: '18c2abcdef', from: 'A', subject: 'B', link: 'https://mail.google.com/x' });
+  assert.deepEqual(tg.out.at(-1).buttons[1].map((b) => b.data), ['m:s:18c2abcdef', 'm:r:18c2abcdef', 'm:t:18c2abcdef']);
+  await phone.onMessage({ kind: 'callback', data: 'm:s:18c2abcdef', chatId: 1 });
+  assert.match(asked.at(-1), /สรุปเมล id 18c2abcdef/);
+});
