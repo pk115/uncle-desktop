@@ -12,6 +12,7 @@ import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
+import { VoiceAgent } from './voice-agent.js';
 import { Computer } from './computer.js';
 import { Settings } from './settings.js';
 import { Bond, Jealousy } from './bond.js';
@@ -305,7 +306,7 @@ async function boot() {
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || listeningUI?.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
   });
   speechUI.configure(config);
-  capri.talk = () => speechUI.level();
+  capri.talk = () => listeningUI?.realtime?.active?listeningUI.realtime.level():speechUI.level();
   listeningUI = new Listening({ host, root: document.getElementById('listening-settings'), indicator: document.getElementById('listening-stop'), speech: speechUI, chat,
     onWake: () => { capri.wake(); if (capri.mode !== 'alert') capri.perform('curious', capri.towardCenter()); },
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
@@ -333,6 +334,8 @@ async function boot() {
       }
     },
   });
+  listeningUI.realtime=new VoiceAgent({host,listening:listeningUI,speech:speechUI,computer:computerUI});
+  listeningUI.realtime.configure(config);
   chat.onComputer = (text,options) => computerUI.request(text,options);
   listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
   chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
@@ -616,7 +619,7 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
-  window.dev = { computer:computerUI, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
+  window.dev = { computer:computerUI, voiceAgent:listeningUI.realtime, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
   host.onWindows((data) => {
@@ -708,6 +711,7 @@ async function boot() {
 
   host.onConfig((cfg) => {
     speechUI.configure(cfg);
+    listeningUI.realtime.configure(cfg);
     listeningUI.configure(cfg);
     picker?.setCharacters(cfg.characters);
     picker?.setDisplay(cfg.scale, cfg.characterFraming);
@@ -748,6 +752,7 @@ async function boot() {
   });
 
   host.onCommand(async (cmd) => {
+    if(cmd.name==='voice-agent-stop'){listeningUI.realtime.stop();return;}
     if (cmd.name === 'listening') { picker.hide(); speechUI.hide(); await listeningUI.show(); return; }
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }

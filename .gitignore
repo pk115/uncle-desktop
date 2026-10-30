@@ -18,3 +18,4 @@ captures/
 /memory*.json
 /work/
 /tmp/
+src/renderer/vendor/

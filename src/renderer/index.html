@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' capri: blob:; connect-src 'self' capri:">
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; media-src 'self' capri: blob:; connect-src 'self' capri: wss://api.elevenlabs.io wss://api.us.elevenlabs.io wss://api.eu.elevenlabs.io wss://api.in.elevenlabs.io">
   <title>Uncle Desktop</title>
   <link rel="stylesheet" href="styles/capri.css">
 </head>
@@ -66,6 +66,7 @@
   <button id="listening-stop" class="speech-stop listening-stop" type="button" hidden>■ ปิดไมโครโฟน</button>
   <button id="speech-stop" class="speech-stop" type="button" hidden>■ หยุดเสียงพูด</button>
   <link rel="stylesheet" href="styles/character-picker.css">
+  <script src="vendor/elevenlabs-client.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

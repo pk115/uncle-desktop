@@ -23,7 +23,10 @@
     "test:hooks": "node --test tests/hooks.test.js",
     "dist": "electron-builder --win",
     "release": "electron-builder --win --publish always",
-    "test:computer:live": "node scripts/smoke-computer.js"
+    "test:computer:live": "node scripts/smoke-computer.js",
+    "prestart": "node scripts/vendor-voice-agent.js",
+    "predev": "node scripts/vendor-voice-agent.js",
+    "predist": "node scripts/vendor-voice-agent.js"
   },
   "keywords": [
     "desktop-companion",
@@ -38,6 +41,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@elevenlabs/client": "1.32.1",
     "electron": "^44.9.3",
     "electron-builder": "^26.18.0"
   },

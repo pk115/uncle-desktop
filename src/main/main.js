@@ -20,6 +20,8 @@ const { createListening, listeningSettings } = require('./listening');
 const { createNative, createComputer } = require('./computer');
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
+let voiceAgentAPI, voiceAgentSession=null;
+const voiceAgent=require('./voice-agent');
 let listening;
 const { TRAY, LANGS } = require('./labels');
 const { createBridge } = require('./bridge');
@@ -396,6 +398,7 @@ function rendererConfig() {
 function updateConfig(patch) {
   if ('scale' in patch && (!Number.isFinite(patch.scale) || patch.scale < 0.45 || patch.scale > 1.6)) throw new Error('Invalid character scale');
   if ('characterFraming' in patch && !['full', 'bust'].includes(patch.characterFraming)) throw new Error('Invalid character framing');
+  if ('voiceAgent' in patch) {patch.voiceAgent=voiceAgent.settings(patch.voiceAgent);voiceAgentAPI?.stop();voiceAgentSession=null;computer?.stop();sendCommand('voice-agent-stop');}
   if ('listening' in patch) patch.listening = listeningSettings(patch.listening);
   if ('characterId' in patch || patch.visible === false || 'listening' in patch) listening?.stop();
   if (patch.muted === true || 'speech' in patch || 'characterId' in patch) speech.stop();
@@ -869,6 +872,28 @@ function registerIpc() {
   ipcMain.handle('computer:answer', (_e, value) => {if(!value||typeof value.jobId!=='string'||typeof value.approvalId!=='string')throw new Error('คำยืนยันต้องตรงกับขั้นตอนปัจจุบัน');return computer.answer(value);});
   ipcMain.on('computer:stop', () => computer.stop());
 
+
+  voiceAgentAPI=voiceAgent.createAgentAPI({getSettings:()=>config.load().voiceAgent,getKey:()=>setup.openKeys(config.load().apiKeys).elevenlabs||process.env.ELEVENLABS_API_KEY,save:value=>updateConfig({voiceAgent:value})});
+  ipcMain.handle('agent:info',()=>({settings:voiceAgent.settings(config.load().voiceAgent),hasKey:Boolean(setup.openKeys(config.load().apiKeys).elevenlabs||process.env.ELEVENLABS_API_KEY),tools:voiceAgent.TOOLS.map(t=>t.name)}));
+  ipcMain.handle('agent:save',(_e,value,key)=>{
+    const settings=voiceAgent.settings(value),patch={voiceAgent:settings};
+    if(key){if(typeof key!=='string'||key.length>512||/[\r\n]/.test(key))throw Error('API key ไม่ถูกต้อง');if(!safeStorage.isEncryptionAvailable())throw Error('Windows ยังเข้ารหัสคีย์ไม่ได้');patch.apiKeys={...config.load().apiKeys,elevenlabs:setup.sealKey(key.trim())};}
+    updateConfig(patch);return settings;
+  });
+  ipcMain.handle('agent:forgetKey',()=>{const {elevenlabs,...apiKeys}=config.load().apiKeys||{};updateConfig({apiKeys,voiceAgent:voiceAgent.settings(config.load().voiceAgent)});return {hasKey:Boolean(process.env.ELEVENLABS_API_KEY)};});
+  ipcMain.handle('agent:voices',()=>voiceAgentAPI.voices());
+  ipcMain.handle('agent:configure',()=>voiceAgentAPI.configure());
+  ipcMain.handle('agent:start',async()=>{listening?.stop();speech.stop();voiceAgentSession=null;const session=await voiceAgentAPI.session();voiceAgentSession=session.sessionId;return {...session,prompt:voiceAgent.PROMPT+' Selected companion: '+characterFor(config.load().characterId).name+'. '+String(config.load().persona||'').slice(0,2000),tools:voiceAgent.TOOLS.map(t=>t.name)};});
+  ipcMain.on('agent:stop',()=>{voiceAgentAPI.stop();voiceAgentSession=null;computer?.stop();});
+  ipcMain.handle('agent:tool',(_e,{sessionId,name,args}={})=>{
+    if(!voiceAgentSession||sessionId!==voiceAgentSession||voiceAgent.settings(config.load().voiceAgent).engine!=='elevenlabs'||!voiceAgent.settings(config.load().voiceAgent).consent)throw Error('การสนทนานี้จบแล้ว');
+    if(computer.busy)throw Error('มีงานกำลังทำอยู่ รอผลหรือหยุดก่อน');
+    if(!computerOptions().consent||!computerOptions().voice)throw Error('ยังไม่ได้ทำ: เปิดควบคุมเครื่อง อนุญาตอ่านหน้าต่างและเริ่มงานด้วยเสียง แล้วบันทึกสิทธิ์ก่อน');
+    const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=pickModel(computerConfig);
+    if(!plan.action&&!computerModel)throw Error('ตั้งค่า AI สำหรับวางแผนควบคุมเครื่องก่อน');
+    const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly});
+    return JSON.stringify({status:'accepted',jobId:id,message:'เริ่มรับงานแล้ว ยังไม่ใช่ผลสำเร็จ รอคำถามหรือผลตรวจจากระบบงาน'});
+  });
   listening = createListening({ directory: path.join(app.getPath('userData'), 'voice-models') });
   ipcMain.handle('listening:info', async () => ({ ...await listening.info(listeningSettings(config.load().listening).localModel), settings: listeningSettings(config.load().listening), hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY), hasGeminiKey: Boolean(setup.openKeys(config.load().apiKeys).gemini || process.env.GEMINI_API_KEY) }));
   ipcMain.handle('listening:save', (_e, value, key) => {

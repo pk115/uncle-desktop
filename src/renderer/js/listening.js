@@ -72,13 +72,13 @@ export class Listening {
   setStatus(text) { this.status.textContent = text; if (this.stream) this.indicator.textContent = `■ ปิดไมค์ · ${text}`; }
   error(error) { this.stop(); this.root.hidden = false; this.onVisibility(true); this.setStatus(String(error.message || error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')); }
   async load() {
-    const info = await this.host.listeningInfo(); this.settings = info.settings;
+    const info = await this.host.listeningInfo(); this.settings = info.settings;await this.realtime?.load();
     for (const key of ['mode', 'provider', 'localModel']) this[key].value = this.settings[key];
     this.silence.value = this.settings.silenceSeconds; this.vocabulary.value = this.settings.vocabulary; this.key.value = ''; this.key.parentElement.hidden = this.settings.provider === 'local';
     this.follow.value = this.settings.followSeconds; this.threshold.value = this.settings.threshold;
     this.words.value = this.settings.wakeWords.join('\n'); this.review.checked = this.settings.review; this.consent.checked = this.settings.cloudConsent;
     const modelStatus = () => { this.modelStatus.textContent = info.models?.[this.localModel.value] ? '✓ โมเดลที่เลือกพร้อม · ตรวจคำเรียกในเครื่อง' : 'ยังไม่มีโมเดลที่เลือก — กดดาวน์โหลดก่อนใช้งาน'; }; this.localModel.onchange = modelStatus; modelStatus();
-    await this.devices(false); this.mic.value = this.settings.deviceId;
+    await this.devices(false); this.mic.value = this.settings.deviceId;this.realtime?.refresh();
   }
   async devices(ask = true) {
     let stream; try {
@@ -122,6 +122,7 @@ export class Listening {
     if (this.settings?.mode === 'push') this.releaseMic();
   }
   async answerConfirmation(text) {
+    if(this.realtime?.active&&this.realtime.pending)return this.realtime.answer(text);
     const request = this.confirmation; if (!request) return;
     if (Date.now() >= request.until) { this.expireConfirmation(); return; }
     const answer = confirmationAnswer(text);
@@ -155,15 +156,17 @@ export class Listening {
     await this.chat.send(text);
   }
   async save() {
+    if(this.realtime)await this.realtime.save();
     const settings = { provider: this.provider.value, localModel: this.localModel.value, silenceSeconds: Number(this.silence.value), vocabulary: this.vocabulary.value, mode: this.mode.value, deviceId: this.mic.value, wakeWords: this.words.value.split('\n').map(s => s.trim()).filter(Boolean), followSeconds: Number(this.follow.value), threshold: Number(this.threshold.value), review: this.review.checked, cloudConsent: this.consent.checked };
     this.stop(); this.settings = await this.host.listeningSave(settings, this.key.value); this.key.value = ''; return this.settings;
   }
-  async toggle() { try { if (this.stream) { if (this.settings.mode === 'push' && !this.processing) { const bytes = this.utterance.finish(); if (bytes) await this.process(bytes); else this.stop(); } else this.stop(); } else await this.begin(); } catch (e) { this.error(e); } }
+  async toggle() { try { if(this.realtime?.active){this.stop();return;} if (this.stream) { if (this.settings.mode === 'push' && !this.processing) { const bytes = this.utterance.finish(); if (bytes) await this.process(bytes); else this.stop(); } else this.stop(); } else await this.begin(); } catch (e) { this.error(e); } }
   async begin(test = false) {
     if (!this.settings) await this.load(); await this.save(); this.testing = test;
     const s = this.settings, info = await this.host.listeningInfo();
+    if(this.realtime?.selected&&!test&&s.mode==='push'){await this.realtime.start();return;}
     if ((s.mode === 'wake' || s.provider === 'local') && !info.ready) throw new Error('กรุณาดาวน์โหลดโมเดลในเครื่องก่อน');
-    if (s.provider !== 'local' && (!s.cloudConsent || !(s.provider === 'gemini' ? info.hasGeminiKey : info.hasKey))) throw new Error('กรุณายินยอมส่งเสียงและบันทึก API key ของบริการที่เลือกก่อน');
+    if (!this.realtime?.selected && s.provider !== 'local' && (!s.cloudConsent || !(s.provider === 'gemini' ? info.hasGeminiKey : info.hasKey))) throw new Error('กรุณายินยอมส่งเสียงและบันทึก API key ของบริการที่เลือกก่อน');
     this.speech.stop(); const serial = this.serial;
     await this.capture(serial);
   }
@@ -212,6 +215,7 @@ export class Listening {
         this.lastResultStatus = waking ? match === null ? 'ทดสอบ: ไม่พบคำเรียก — ไม่มีการส่งคำสั่ง' : 'ทดสอบ: พบคำเรียก — ไม่มีการส่งคำสั่ง' : 'ทดสอบเสร็จ — ไม่มีการส่งคำสั่ง';
         this.setStatus(this.lastResultStatus); if (this.settings.mode === 'push') this.releaseMic(); return;
       }
+      if(this.realtime?.selected&&!this.realtime.active&&!this.testing&&waking){const command=wakeCommand(text,this.settings.wakeWords);if(command===null){this.lastResultStatus='ยังไม่พบคำเรียก';return;}this.releaseMic();await this.realtime.start(command);return;}
       if (this.externalJob && !this.confirmation) {await this.onJobControl?.(wakeCommand(text,this.settings.wakeWords)??text);return;}
       if (this.confirmation) { await this.answerConfirmation(wakeCommand(text, this.settings.wakeWords) ?? text); return; }
       if (waking) {
@@ -268,5 +272,5 @@ export class Listening {
     this.context?.close().catch(() => {}); this.context = null; this.utterance?.reset(); this.level.value = 0;
     this.indicator.hidden = true; this.startButton.textContent = '🎤 เริ่มฟัง';
   }
-  stop() { const pending=this.confirmation;this.serial++;pending?.cancel?.(); this.clearConfirmation(); this.releaseMic(); this.host.listeningStop(); this.processing = false; this.pending = false; this.followUntil = 0; this.submitting = false; this.lastResultStatus = ''; if (this.sendButton) this.sendButton.disabled = true; this.setStatus('ไมค์ปิดอยู่'); }
+  stop() { this.realtime?.stop();const pending=this.confirmation;this.serial++;pending?.cancel?.(); this.clearConfirmation(); this.releaseMic(); this.host.listeningStop(); this.processing = false; this.pending = false; this.followUntil = 0; this.submitting = false; this.lastResultStatus = ''; if (this.sendButton) this.sendButton.disabled = true; this.setStatus('ไมค์ปิดอยู่'); }
 }
