@@ -340,7 +340,10 @@ async function boot() {
   listeningUI.realtime=new VoiceAgent({host,listening:listeningUI,speech:speechUI,computer:computerUI});
   listeningUI.realtime.configure(config);
   chat.onComputer = (text,options) => computerUI.request(text,options);
-  listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
+  // a job running: you can talk to her mid-job (not to answer a question she asked: that's its buttons)
+  const tellJob = (text) => ['running'].includes(computerUI.state?.status) ? host.computerTell(text).catch(() => false) : false;
+  chat.onJobTell = tellJob;
+  listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else if(await tellJob(text))listeningUI.setStatus('รับทราบ: '+text);else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
   chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
   chat.onSpeechStop = () => { speechUI.stop(); listeningUI.stop(); };
   brain.onTalk = () => chat.start();
@@ -760,6 +763,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'computer-cursor') { // her own cursor glides there just before she clicks
+      let c = document.getElementById('her-cursor');
+      if (!c) { c = document.createElement('div'); c.id = 'her-cursor'; c.setAttribute('aria-hidden', 'true'); document.body.append(c); }
+      c.style.left = `${cmd.x}px`; c.style.top = `${cmd.y}px`; c.classList.add('is-on');
+      clearTimeout(c.timer); c.timer = setTimeout(() => c.classList.remove('is-on'), 2500);
+      return;
+    }
     if(cmd.name==='computer-companion'){
       const action=cmd.action;
       if(action==='sleep')capri.setMode('sleep');

@@ -274,6 +274,7 @@ export class Chat {
 
   async send(text) {
     if (this.turn || !this.open) return;
+    if(this.onJobTell&&await this.onJobTell(text))return; // a job running: what you type goes to her hands
     const job=computerTask(text);
     if(job&&this.onComputer){await this.onComputer(job,{voice:false});return;}
     const id = Date.now();
@@ -544,6 +545,17 @@ export class Chat {
       const then = game && ['steam', 'epic', 'app', 'file'].includes(game.kind) && !game.risky ? await this.openNow(game) : await this.youtube(asked.song);
       if (!first?.line) return then;
       return { line: [first.line, then?.line].filter(Boolean).join('\n'), face: then?.face || first.face };
+    }
+    // "open Discord, Spotify and Steam": each one, when every part names something here
+    const parts = asked.single ? [] : asked.text.split(/\s*(?:,|、|และ|กับ|แล้วก็|\band\b|\bet\b|\by\b|\be\b|\bи\b)\s*/i).filter((p) => p.trim());
+    if (parts.length > 1 && parts.length <= 6) {
+      const found = await Promise.all(parts.map((p) => this.host.findLaunch(p)));
+      if (found.every((item, i) => item || namedSite(parts[i]))) {
+        const done = [];
+        for (const part of parts) done.push(await this.doNow({ kind: 'open', text: part, single: true }));
+        const lines = done.filter((d) => d?.line).map((d) => d.line);
+        if (lines.length) return { line: lines.join('\n'), face: 'laugh' }; // one that would run something on its own waits for you to ask it alone
+      }
     }
     const item = await this.host.findLaunch(asked.text);
     const site = namedSite(asked.text);

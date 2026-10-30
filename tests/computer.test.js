@@ -52,3 +52,26 @@ test('direct voice media actions use the shared job gates without a second plann
  const c=createComputer({native,system:async a=>{tools++;assert.equal(a.action,'now_playing');return 'ไม่พบเพลง'},decide:async()=>{modelCalls++;throw Error('must not plan')},notify:s=>last=s});
  c.start({task:'current song',consent:true,voice:true,directAction:{tool:'media',action:'now_playing',reason:'ดูเพลง'}});while(c.busy)await wait();assert.equal(last.status,'done');assert.equal(tools,1);assert.equal(modelCalls,0);assert.equal(last.evidence,'ไม่พบเพลง');
 });
+test('security levels: trusted asks only for risky steps, blackwall never',()=>{
+ const view={app:{process:'chrome',title:'Shop'},targets:[{id:1,role:'Button',name:'Send'},{id:2,role:'Button',name:'Buy now'}]};
+ assert.ok(needsConfirmation({tool:'click',target:1},view,'guarded'));
+ assert.ok(!needsConfirmation({tool:'click',target:1},view,'trusted'));assert.ok(needsConfirmation({tool:'click',target:2},view,'trusted'));
+ assert.ok(needsConfirmation({tool:'power',action:'shutdown'},view,'trusted'));
+ assert.ok(!needsConfirmation({tool:'click',target:2},view,'blackwall'));assert.ok(!needsConfirmation({tool:'power',action:'shutdown'},view,'blackwall'));
+ const computer=createComputer({native:{request:async()=>({}),stop(){}},decide:async()=>''});
+ assert.throws(()=>computer.start({task:'x',consent:true,security:'yolo'}));
+});
+test('what you say mid-job reaches her next step',async()=>{
+ const view={app:{window:1,process:'notepad',title:'Notepad'},targets:[{id:1,role:'Document',name:'Text',value:'hi there'}]};
+ let calls=0,seen=null,c;
+ c=createComputer({native:{request:async a=>a.action==='windows'?[]:view,stop(){}},decide:async({history})=>{calls++;if(calls===1){c.tell('also say bye');return JSON.stringify({tool:'wait',reason:'wait',seconds:0.05});}seen=history;return JSON.stringify({tool:'done',reason:'ok',evidence:'hi there'});}});
+ assert.equal(c.tell('nobody working'),false);
+ c.start({task:'type hi',consent:true});
+ for(let i=0;i<50&&c.busy;i++)await new Promise(r=>setTimeout(r,50));
+ assert.ok(seen.some(h=>h.user==='also say bye'));
+});
+test('hold_and_press: two real keys, asks first when guarded',()=>{
+ assert.equal(actionFrom(JSON.stringify({tool:'hold_and_press',reason:'jump forward',hold:'W',text:'SPACE',seconds:1})).hold,'W');
+ assert.throws(()=>actionFrom(JSON.stringify({tool:'hold_and_press',reason:'x',hold:'W'})));
+ assert.ok(needsConfirmation({tool:'hold_and_press',hold:'W',text:'SPACE'},{targets:[]}));
+});

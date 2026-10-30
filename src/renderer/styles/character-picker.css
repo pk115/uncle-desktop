@@ -179,3 +179,10 @@
 .speech-box .settings-switch input:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .speech-box .settings-action { align-self: start; }
 .speech-box .settings-note { color: var(--paper-2); }
+
+/* her own cursor: a neon arrow that glides to what she's about to click */
+#her-cursor { position: fixed; left: 50%; top: 50%; width: 22px; height: 28px; z-index: 300; pointer-events: none; opacity: 0;
+  background: #39ff88; clip-path: polygon(0 0, 0 100%, 30% 72%, 52% 100%, 66% 92%, 45% 66%, 85% 66%);
+  filter: drop-shadow(0 0 6px #39ff88) drop-shadow(0 0 2px #ff2bd6); transition: left .35s cubic-bezier(.2,.8,.2,1), top .35s cubic-bezier(.2,.8,.2,1), opacity .2s; }
+#her-cursor.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { #her-cursor { transition: opacity .2s; } }

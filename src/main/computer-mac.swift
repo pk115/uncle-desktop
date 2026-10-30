@@ -190,6 +190,17 @@ func act(_ r: [String: Any]) throws -> [String: Any] {
       var c = unit
       for down in [true, false] { let e = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down); e?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &c); post(e) }
     }
+  } else if action == "hold_and_press" { // games: hold one key down, press another meanwhile
+    let pair = text.uppercased().split(separator: "|").map(String.init)
+    guard pair.count == 2 else { throw Fail("ระบุคีย์ที่กดค้างและคีย์ที่กด") }
+    let codes = { (s: String) throws -> [CGKeyCode] in try s.split(separator: "+").map { guard let k = KEYS[String($0)] else { throw Fail("คีย์นี้ยังไม่รองรับ") }; return k } }
+    let held = try codes(pair[0]), tap = try codes(pair[1])
+    let key = { (code: CGKeyCode, down: Bool) in post(CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down)) }
+    try cancelled()
+    held.forEach { key($0, true) }
+    defer { held.reversed().forEach { key($0, false) } }
+    usleep(60_000); tap.forEach { key($0, true) }; tap.reversed().forEach { key($0, false) }
+    let ms = max(50, min(3000, duration)); var t = 0; while t < ms { try cancelled(); usleep(20_000); t += 20 }
   } else if action == "key" || action == "hold_key" {
     if let f = focusedElement(), secret(f), !["TAB", "SHIFT+TAB", "ESC"].contains(text) { throw Fail("กรุณากรอกรหัสผ่านด้วยตนเอง") }
     let names = text.uppercased().split(separator: "+").map(String.init)

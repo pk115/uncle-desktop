@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('host', {
   computerStart: request => ipcRenderer.invoke('computer:start', request),
   computerAnswer: yes => ipcRenderer.invoke('computer:answer', yes),
   computerStop: () => ipcRenderer.send('computer:stop'),
+  computerTell: text => ipcRenderer.invoke('computer:tell', text),
   onComputerState: on('computer:state'),
   agentInfo:()=>ipcRenderer.invoke('agent:info'),
   agentSave:(value,key)=>ipcRenderer.invoke('agent:save',value,key),
