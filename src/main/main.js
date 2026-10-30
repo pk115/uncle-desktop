@@ -1566,6 +1566,7 @@ function main() {
     mcp.start().then(() => rebuildTray()).catch(() => {});
     personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: notifyUser, log: (line) => console.log(line) });
     personal.start();
+    jobs.start();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
