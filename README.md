@@ -104,3 +104,18 @@ Local Thai-tuned Thonburian medium, Gemini transcription, configurable pause dur
 ### 0.8.1 — Updates itself, moves with her voice
 
 Installed copies now check GitHub Releases on start and every 6 hours, download new versions quietly and install them when she quits. She also moves with her voice while she reads replies aloud. Install 0.8.1 once by hand; later versions arrive on their own.
+
+
+### 0.9.0 — Computer control (Windows)
+
+Read UI Automation targets, type Thai, click, scroll and run bounded multi-step jobs with the selected AI. Includes step status, confirmations, stop hotkey and observed-text completion checks. See [computer control guide](docs/COMPUTER_CONTROL_TH.md). Inspired by the [Capri project by Lachy](https://github.com/lachydotmcg/capri-desktop).
+
+
+### 0.11.0 — Switchable ElevenLabs Voice Agent
+
+Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous voice with interruption handling and 13 client-tool categories. Thai uses Eleven v3 Conversational. See [Thai setup and validation guide](docs/VOICE_AGENT_TH.md).
+
+
+### 0.12.0 — Four new companions
+
+Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.

@@ -135,6 +135,7 @@ export class Capri {
     this.sprite.dispose?.();
     this.sprite = next;
     this.character = character;
+    this.sprite.setFraming?.(this.framing);
     this.alphaMap = this.sprite.pixels;
     this.hull = buildHull(this.alphaMap);
     this.setScale(this.scale);
@@ -142,10 +143,23 @@ export class Capri {
   }
 
   setScale(scale) {
-    this.scale = scale;
-    this.sprite.resize(scale);
+    this.scale = clamp(Number(scale) || 0.6, 0.45, Math.min(1.6, (this.view.h - 24) / SPRITE.height, (this.view.w - 24) / SPRITE.width));
+    this.sprite.resize(this.scale);
+    if (this.stance === 'stand') {
+      const half = SPRITE.width * this.scale / 2;
+      this.pos.x = clamp(this.pos.x, half + 6, this.view.w - half - 6);
+      this.pos.y = clamp(this.pos.y, SPRITE.height * this.scale, this.view.floor - 4);
+    }
     this.pivot();
     this.place();
+  }
+
+  setFraming(framing) {
+    this.framing = framing === 'bust' ? 'bust' : 'full';
+    this.sprite.setFraming?.(this.framing);
+    this.alphaMap = this.sprite.pixels;
+    this.hull = buildHull(this.alphaMap);
+    this.drawFrame();
   }
 
   // Flip, lean and squash all pivot on her feet, or on her seat when she sits on a ledge (so a

@@ -1,6 +1,6 @@
 {
   "name": "uncle-desktop",
-  "version": "0.8.1",
+  "version": "0.12.1",
   "description": "A Thai-friendly AI desktop companion with selectable characters and coding agent status.",
   "author": "TheUncleDev",
   "repository": "github:pk115/uncle-desktop",
@@ -22,7 +22,11 @@
     "check:llm": "node scripts/check-llm.js",
     "test:hooks": "node --test tests/hooks.test.js",
     "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish always",
+    "test:computer:live": "node scripts/smoke-computer.js",
+    "prestart": "node scripts/vendor-voice-agent.js",
+    "predev": "node scripts/vendor-voice-agent.js",
+    "predist": "node scripts/vendor-voice-agent.js"
   },
   "keywords": [
     "desktop-companion",
@@ -37,6 +41,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@elevenlabs/client": "1.32.1",
     "electron": "^44.9.3",
     "electron-builder": "^26.18.0"
   },
@@ -62,12 +67,16 @@
       "README.md",
       "README.th.md",
       "README.upstream.md",
-      "docs/*.md"
+      "docs/*.md",
+      "!scripts/live-*.js"
     ],
     "asarUnpack": [
       "hooks/**",
       "src/main/windows.ps1",
-      "src/main/speech.ps1"
+      "src/main/speech.ps1",
+      "src/main/computer.ps1",
+      "src/main/computer-native.cs",
+      "src/main/computer-audio.cs"
     ],
     "win": {
       "target": "nsis",

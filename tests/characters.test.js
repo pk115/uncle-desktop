@@ -12,7 +12,7 @@ const load = (file) => import(pathToFileURL(path.join(__dirname, '../src/rendere
 test('only shipped character IDs resolve, and each has the complete asset set', () => {
   assert.equal(characterFor('blacky').name, 'Blacky');
   assert.equal(characterFor('capri').renderer, 'capri');
-  for (const id of ['bald-man', 'lazy-boy', 'angry-guy', 'drunk-uncle', 'vulture', 'chubby-girl', 'cute-girl', 'fatty-girl', 'pinky', 'mira']) {
+  for (const id of ['bald-man', 'lazy-boy', 'angry-guy', 'drunk-uncle', 'vulture', 'chubby-girl', 'cute-girl', 'fatty-girl', 'pinky', 'mira', 'mochi', 'lili', 'luna', 'pudding']) {
     assert.equal(characterFor(id).id, id, `Missing requested character: ${id}`);
   }
   assert.equal(characterFor('../../missing').id, 'angry-boy');
@@ -40,6 +40,20 @@ test('animation priority keeps permission visible, and reactions return to the c
   assert.equal(frameFor('error', 1000), 16);
   assert.equal(frameFor('sleep', 9500, 4, true), 20);
   assert.ok(frameFor('unknown', 500) < 4);
+});
+
+test('speaking uses authored mouth frames and respects sleep and reduced motion', async () => {
+  const { speakingFrame, frameFor, sourceRect } = await load('character-renderer.js');
+  assert.equal(speakingFrame('idle', 0, 4, false, 0.7, true), 9);
+  assert.equal(speakingFrame('idle', 140, 4, false, 0.7, true), 10);
+  assert.equal(speakingFrame('idle', 140, 4, false, 0, true), frameFor('idle', 140, 4));
+  assert.equal(speakingFrame('sleep', 0, 4, false, 0.7, true), 20);
+  assert.equal(speakingFrame('idle', 0, 4, true, 0.7, true), 0);
+  assert.equal(speakingFrame('idle', 0, 4, false, 0.7, false), 0);
+  const crop = sourceRect({}, 'bust');
+  assert.equal(crop.width / crop.height, 320 / 420, 'upper-body framing must not stretch the face');
+  assert.ok(crop.x >= 0 && crop.y >= 0 && crop.x + crop.width <= 320 && crop.y + crop.height <= 420);
+  assert.deepEqual(sourceRect({}, 'full'), { x: 0, y: 0, width: 320, height: 420 });
 });
 
 test('character copy changes identity without mutating the original locale or another character', async () => {

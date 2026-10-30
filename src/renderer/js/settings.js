@@ -12,7 +12,7 @@ export function accelerator(e) {
 }
 const shown = (keys) => (keys ? keys.replace('Control', 'Ctrl').replace('Super', 'Win') : 'ปิดอยู่');
 
-const HOTKEYS = [['toggle', 'ซ่อน / เรียกตัวละคร'], ['voice', 'เริ่ม / หยุดพูด'], ['mute', 'ปิดไมค์ทันที']];
+const HOTKEYS = [['stopJob', 'หยุดงานควบคุมเครื่อง'], ['toggle', 'ซ่อน / เรียกตัวละคร'], ['voice', 'เริ่ม / หยุดพูด'], ['mute', 'ปิดไมค์ทันที']];
 const PROVIDERS = { ollama: 'Ollama', openai: 'OpenAI', gemini: 'Gemini', claude: 'Claude Code', custom: 'เซิร์ฟเวอร์ที่ตั้งเอง' };
 const SPEECH = { edge: 'เสียงไทย Edge', windows: 'เสียง Windows', openai: 'OpenAI' };
 const STT = { local: 'ถอดเสียงในเครื่อง', gemini: 'Gemini', openai: 'OpenAI' };
@@ -29,7 +29,7 @@ export class Settings {
     // what's set, each with the panel that changes it
     box.append(el('h2', 'ภาพรวม'));
     this.rows = {};
-    for (const [id, label, button] of [['ai', 'AI แชต', 'ตั้งค่า AI'], ['characters', 'ตัวละคร', 'เลือกตัวละคร'], ['speech', 'เสียงพูด', 'ตั้งค่าเสียงพูด'], ['listening', 'สั่งงานด้วยเสียง', 'ตั้งค่าไมค์'], ['customize', 'ชื่อ / ความจำ', 'แก้ไข']]) {
+    for (const [id, label, button] of [['ai', 'AI แชต', 'ตั้งค่า AI'], ['characters', 'ตัวละคร', 'เลือกตัวละคร'], ['speech', 'เสียงพูด', 'ตั้งค่าเสียงพูด'], ['listening', 'สั่งงานด้วยเสียง', 'ตั้งค่าไมค์'], ['computer', 'ควบคุมเครื่อง', 'เริ่มงาน'], ['customize', 'ชื่อ / ความจำ', 'แก้ไข']]) {
       const row = el('div'); row.className = 'settings-row';
       const value = el('span'); this.rows[id] = value;
       const open = el('button', button); open.type = 'button'; open.onclick = () => { this.hide(); this.onOpen(id); };
@@ -55,7 +55,7 @@ export class Settings {
     }
     const keyActions = el('div'); keyActions.className = 'speech-actions';
     const saveKeys = el('button', 'บันทึกคีย์ลัด'); saveKeys.type = 'button'; saveKeys.onclick = () => this.saveKeys();
-    const defaults = el('button', 'คืนค่าเริ่มต้น'); defaults.type = 'button'; defaults.onclick = () => this.saveKeys({ toggle: 'Control+Alt+C', voice: 'Control+Alt+V', mute: 'Control+Alt+M' });
+    const defaults = el('button', 'คืนค่าเริ่มต้น'); defaults.type = 'button'; defaults.onclick = () => this.saveKeys({ stopJob: 'Control+Alt+X', toggle: 'Control+Alt+C', voice: 'Control+Alt+V', mute: 'Control+Alt+M' });
     keyActions.append(saveKeys, defaults);
     box.append(keyActions);
 
@@ -107,6 +107,7 @@ export class Settings {
       this.rows.characters.textContent = cfg.character?.name || '';
       this.rows.speech.textContent = `${SPEECH[cfg.speech?.provider] || 'ยังไม่ได้ตั้ง'}${cfg.speech?.auto ? ' · อ่านคำตอบเอง' : ''}`;
       this.rows.listening.textContent = `${STT[cfg.listening?.provider] || 'ยังไม่ได้ตั้ง'} · ${cfg.listening?.mode === 'wake' ? 'รอคำเรียก' : 'กดพูด'}`;
+      this.rows.computer.textContent = 'คลิก · พิมพ์ · ตรวจผล · Ctrl+Alt+X หยุด';
       this.rows.customize.textContent = `${cfg.userName || 'ยังไม่ได้บอกชื่อ'} · จำไว้ ${(cfg.memories || []).length} เรื่อง`;
       for (const [id] of HOTKEYS) { this.keys[id].dataset.keys = keys[id] || ''; this.keys[id].value = shown(keys[id]); }
       for (const id of ['personality', 'me']) this.noteState[id].textContent = notes[id] ? `${notes[id].split('\n').filter(Boolean).length} บรรทัด` : 'ยังว่าง';
