@@ -125,4 +125,13 @@ const TRAY = {
   },
 };
 
+// on a Mac: macOS instead of Windows, the Dock instead of the taskbar
+if (process.platform === 'darwin') {
+  const DOCK = { th: 'นั่งบน Dock', fr: 'Assise sur le Dock', en: 'Sitting on the Dock', es: 'Sentada en el Dock', pt: 'Sentada no Dock', ru: 'Сидит на Dock' };
+  for (const [lang, t] of Object.entries(TRAY)) {
+    for (const k of Object.keys(t)) if (typeof t[k] === 'string') t[k] = t[k].replace(/Windows/g, 'macOS');
+    if (DOCK[lang]) t.restTaskbar = DOCK[lang];
+  }
+}
+
 module.exports = { TRAY, LANGS: Object.keys(TRAY) };
