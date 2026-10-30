@@ -256,6 +256,14 @@ export class Settings {
     const more = el('div', '', 'wizard-row');
     more.append(button('ควบคุมเครื่อง…', () => { this.hide(); this.onOpen('computer'); }), button('ชื่อเล่นและความจำสั้น…', () => { this.hide(); this.onOpen('customize'); }));
     this.body.append(more);
+
+    this.body.append(el('h2', 'ล้างการตั้งค่าทั้งหมด'), el('p', 'คืนทุกอย่างเป็นค่าเริ่มต้นและลบ API key ที่บันทึกไว้ แล้วเริ่มตั้งค่าทีละขั้นใหม่ ไม่ลบโมเดลเสียงที่ดาวน์โหลดแล้ว ตัวละครที่นำเข้า ประวัติสนทนา และไฟล์ personality.md / me.md'));
+    const reset = button('ล้างการตั้งค่าทั้งหมด…', () => {
+      if (reset.dataset.armed) return this.host.resetConfig().catch((e) => this.error(e));
+      reset.dataset.armed = '1'; reset.textContent = 'กดอีกครั้งเพื่อยืนยันการล้าง'; reset.classList.add('wizard-danger');
+      this.status.textContent = 'ยังไม่ได้ล้าง — กดปุ่มเดิมอีกครั้งเพื่อยืนยัน หรือปิดหน้านี้เพื่อยกเลิก';
+    });
+    this.body.append(reset);
   }
 
   async saveKeys(keys = Object.fromEntries(HOTKEYS.map(([id]) => [id, this.keys[id].dataset.keys]))) {

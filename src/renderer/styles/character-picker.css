@@ -160,3 +160,4 @@
 .wizard-footer { margin-top: 8px; }
 @media (max-width: 720px) { .wizard { grid-template-columns: 1fr; } .wizard-steps { border-right: 0; flex-direction: row; overflow-x: auto; } }
 .settings-box .speech-status:empty { display: none; }
+.speech-box .wizard-danger { border: 2px solid var(--red); color: var(--paper); }

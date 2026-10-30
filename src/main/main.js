@@ -976,6 +976,13 @@ function registerIpc() {
   ipcMain.handle('config:get', () => rendererConfig());
   ipcMain.handle('hooks:status', () => activeHooks().status());
   ipcMain.handle('config:set', (_e, patch) => updateConfig(patch));
+  // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
+  ipcMain.handle('config:reset', () => {
+    speech.stop(); listening?.stop(); computer?.stop(); voiceAgentAPI?.stop(); voiceAgentSession = null;
+    config.reset();
+    registerHotkeys(); rebuildTray();
+    overlay?.webContents.reload();
+  });
   ipcMain.handle('demo:window', (_e, open) => demoWindow(open));
   // right-clicking her: the same menu as the tray icon (which Windows often hides behind the ^ by the clock)
   ipcMain.on('menu:open', () => trayMenu?.popup({ window: overlay }));

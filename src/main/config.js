@@ -71,4 +71,11 @@ function save(patch) {
   return cache;
 }
 
-module.exports = { load, save, file, DEFAULTS };
+// every setting back to its default, saved keys included
+function reset() {
+  cache = null;
+  fs.rmSync(file(), { force: true });
+  return load();
+}
+
+module.exports = { load, save, reset, file, DEFAULTS };
