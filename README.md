@@ -270,7 +270,8 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
-| **0.17.0** | Three brain tiers; Kokoro free local voice + ElevenLabs + Fish + your own server; voice effects (pitch, robot, glitch, layers); ten security switches; mini player and dancing to music |
+| **0.17.1** | Fix: dialogs that sometimes stopped taking clicks; size, full/upper body and AI model in the right-click menu |
+| 0.17.0 | Three brain tiers; Kokoro free local voice + ElevenLabs + Fish + your own server; voice effects (pitch, robot, glitch, layers); ten security switches; mini player and dancing to music |
 | 0.16.0 | Four security levels, talking mid-job, several apps in one ask, game keys, her neon cursor |
 | 0.15.0 | The Windows features on a Mac: computer control, local speech to text, sitting on windows, music |
 | 0.14.0 | First Mac build (Apple silicon and Intel) |
