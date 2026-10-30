@@ -70,3 +70,8 @@ test('what you say mid-job reaches her next step',async()=>{
  for(let i=0;i<50&&c.busy;i++)await new Promise(r=>setTimeout(r,50));
  assert.ok(seen.some(h=>h.user==='also say bye'));
 });
+test('hold_and_press: two real keys, asks first when guarded',()=>{
+ assert.equal(actionFrom(JSON.stringify({tool:'hold_and_press',reason:'jump forward',hold:'W',text:'SPACE',seconds:1})).hold,'W');
+ assert.throws(()=>actionFrom(JSON.stringify({tool:'hold_and_press',reason:'x',hold:'W'})));
+ assert.ok(needsConfirmation({tool:'hold_and_press',hold:'W',text:'SPACE'},{targets:[]}));
+});

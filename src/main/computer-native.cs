@@ -123,13 +123,21 @@ public static class UncleComputer {
     } else if(action=="type") {
       if(e!=null)e.SetFocus();Check(h);var focused=AutomationElement.FocusedElement;if(focused==null||Secret(focused)||Pid(h)!=focused.Current.ProcessId)throw new Exception("ช่องกรอกไม่ถูกต้อง");
       foreach(char c in text??"") {Check(h);Inputs(new[]{K(0,c,4),K(0,c,6)});}
-    } else if(action=="key" || action=="hold_key") {
+    } else if(action=="key" || action=="hold_key" || action=="hold_and_press") {
       var focused=AutomationElement.FocusedElement;if(focused!=null && Secret(focused) && text!="TAB" && text!="SHIFT+TAB" && text!="ESC")throw new Exception("กรุณากรอกรหัสผ่านด้วยตนเอง");
       var map=new Dictionary<string,ushort>{{"CTRL",0x11},{"ALT",0x12},{"SHIFT",0x10},{"ENTER",0x0D},{"TAB",9},{"ESC",0x1B},{"BACKSPACE",8},{"SPACE",32},{"UP",38},{"DOWN",40},{"LEFT",37},{"RIGHT",39},{"HOME",36},{"END",35},{"PAGEUP",33},{"PAGEDOWN",34},{"A",65},{"C",67},{"V",86},{"X",88},{"Z",90},{"Y",89},{"S",83},{"F",70},{"L",76},{"W",87},{"T",84},{"F4",0x73},{"F5",0x74}};
       map["WIN"]=0x5B;map["DELETE"]=0x2E;map["INSERT"]=0x2D;map["PRINTSCREEN"]=0x2C;map["PLUS"]=0xBB;map["MINUS"]=0xBD;map["PERIOD"]=0xBE;
       for(char letter='A';letter<='Z';letter++)map[letter.ToString()]=letter;
       for(char number='0';number<='9';number++)map[number.ToString()]=number;
       for(int f=1;f<=12;f++)map["F"+f]=(ushort)(0x6F+f);
+      if(action=="hold_and_press") {
+        var pair=(text??"").Split('|');if(pair.Length!=2)throw new Exception("ระบุคีย์ที่กดค้างและคีย์ที่กด");
+        Func<string,List<ushort>> parse=s=>{var l=new List<ushort>();foreach(string n in s.ToUpperInvariant().Split('+')){ushort k;if(!map.TryGetValue(n,out k))throw new Exception("คีย์นี้ยังไม่รองรับ");l.Add(k);}return l;};
+        var held=parse(pair[0]);var tap=parse(pair[1]);duration=Math.Max(50,Math.Min(3000,duration));
+        try{foreach(ushort k in held)Inputs(new[]{K(k,0,0)});Thread.Sleep(60);var press=new List<Input>();foreach(ushort k in tap)press.Add(K(k,0,0));for(int i=tap.Count-1;i>=0;i--)press.Add(K(tap[i],0,2));Check(h);Inputs(press.ToArray());for(int i=0;i<duration;i+=20){Check(h);Thread.Sleep(20);}}
+        finally{held.Reverse();foreach(ushort k in held)Inputs(new[]{K(k,0,2)});}
+        return new{ok=true};
+      }
       var names=(text??"").ToUpperInvariant().Split('+');var keys=new List<ushort>();foreach(string n in names){ushort k;if(!map.TryGetValue(n,out k))throw new Exception("คีย์นี้ยังไม่รองรับ");keys.Add(k);}
       if(action=="hold_key"){duration=Math.Max(50,Math.Min(3000,duration));try{foreach(ushort k in keys)Inputs(new[]{K(k,0,0)});for(int i=0;i<duration;i+=20){Check(h);Thread.Sleep(20);}}finally{keys.Reverse();foreach(ushort k in keys)Inputs(new[]{K(k,0,2)});}return new{ok=true};}
       var batch=new List<Input>();foreach(ushort k in keys)batch.Add(K(k,0,0));keys.Reverse();foreach(ushort k in keys)batch.Add(K(k,0,2));Check(h);Inputs(batch.ToArray());
