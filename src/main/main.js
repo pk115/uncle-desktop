@@ -221,7 +221,8 @@ function createOverlay() {
     overlay.showInactive();
   });
   overlay.webContents.on('render-process-gone', (_e, details) => {
-    console.error('[capri] renderer gone:', details.reason);
+    logError('renderer gone', details.reason);
+    if (details.reason !== 'clean-exit' && !overlay.isDestroyed()) overlay.webContents.reload(); // bring her back
   });
   if (DEV) {
     overlay.webContents.on('console-message', (e) => {
@@ -1115,9 +1116,19 @@ function applyRender() {
   if (DEV) app.whenReady().then(() => setTimeout(() => console.log('[capri] display:', render, JSON.stringify(app.getGPUFeatureStatus())), 4000));
 }
 
+// Errors go to errors.txt beside her settings instead of Electron's crash dialog, so one bad call doesn't take her down.
+function logError(what, err) {
+  console.error(`[uncle] ${what}:`, err);
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'errors.txt'), `${new Date().toISOString()} ${what}: ${err?.stack || err}\n`);
+  } catch {}
+}
+
 function main() {
   // Keep existing settings, imported characters and chat history across the rename.
   app.setPath('userData', path.join(app.getPath('appData'), 'capri-desktop'));
+  process.on('uncaughtException', (err) => logError('uncaught', err));
+  process.on('unhandledRejection', (err) => logError('unhandled rejection', err));
   applyRender();
   if (!app.requestSingleInstanceLock()) {
     app.quit();
