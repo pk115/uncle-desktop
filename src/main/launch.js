@@ -28,10 +28,11 @@ const words = (text) => plain(text).split(/[^\p{L}\p{N}]+/u).filter((w) => w.len
 // Everything she can open: [{ name, kind: 'app' | 'steam' | 'epic', id }]
 async function launchables() {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.items;
-  if (MAC) { // the .app bundles in the Applications folders: opened by their path
+  if (MAC) { // Steam's games, then the .app bundles in the Applications folders (opened by their path)
     const dirs = ['/Applications', '/System/Applications', '/System/Applications/Utilities', path.join(app.getPath('home'), 'Applications')];
     const items = dirs.flatMap((dir) => { try { return fs.readdirSync(dir).filter((n) => n.endsWith('.app')).map((n) => ({ name: n.slice(0, -4), kind: 'app', id: path.join(dir, n) })); } catch { return []; } })
       .filter((item) => !SKIP.test(item.name));
+    items.unshift(...steamGames(await steamRoot()));
     cache = { at: Date.now(), items };
     return items;
   }
@@ -56,6 +57,7 @@ async function launchables() {
 }
 
 function steamRoot() {
+  if (MAC) { const root = path.join(app.getPath('home'), 'Library', 'Application Support', 'Steam'); return Promise.resolve(fs.existsSync(root) ? root : null); }
   return new Promise((resolve) => {
     execFile('reg.exe', ['query', 'HKCU\\Software\\Valve\\Steam', '/v', 'SteamPath'], { windowsHide: true, timeout: 5000 }, (err, out) => {
       const found = !err && /SteamPath\s+REG_SZ\s+(.+)/.exec(String(out))?.[1].trim();
@@ -224,10 +226,18 @@ const KEY_DOWN = 1; // KEYEVENTF_EXTENDEDKEY
 const KEY_UP = 3;   // ...and KEYEVENTF_KEYUP
 
 async function media(action) {
-  if (MAC) { // the volume through AppleScript; play/pause has no system-wide command there
+  if (MAC) { // the volume through AppleScript; the music to Spotify or Music, whichever is open
     const step = { volup: '+ 10', voldown: '- 10' }[action];
+    const verb = { pause: 'pause', play: 'play', next: 'next track', previous: 'previous track' }[action];
     const script = step ? `set volume output volume ((output volume of (get volume settings)) ${step})`
-      : action === 'mute' ? 'set volume output muted (not (output muted of (get volume settings)))' : null;
+      : action === 'mute' ? 'set volume output muted (not (output muted of (get volume settings)))'
+        : verb ? `if application "Spotify" is running then
+tell application "Spotify" to ${verb}
+else if application "Music" is running then
+tell application "Music" to ${verb}
+else
+error "no player"
+end if` : null;
     return script ? new Promise((r) => execFile('osascript', ['-e', script], (err) => r(!err))) : false;
   }
   if (!WIN || !MEDIA[action]) return false;

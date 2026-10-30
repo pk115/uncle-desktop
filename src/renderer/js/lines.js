@@ -1769,6 +1769,14 @@ export const LINES = {
 
 // The coding assistants she can watch besides Claude Code: the same lines with their name, their
 // hooks file, and what to do once her hooks are in.
+// on a Mac: macOS instead of Windows, and her icon is up in the menu bar
+if (globalThis.navigator?.platform?.startsWith('Mac')) {
+  const mac = (o) => { for (const k of Object.keys(o)) { if (typeof o[k] === 'string') o[k] = o[k].replace(/Windows/g, 'macOS'); else if (o[k] && typeof o[k] === 'object') mac(o[k]); } };
+  mac(LINES);
+  Object.assign(LINES.th.guide.icon, { line: 'ไอคอนฉันอยู่บน menu bar ด้านบนขวา', hidden: 'ถ้าไม่เห็น menu bar อาจเต็ม ลองซ่อนไอคอนอื่นบ้าง หรือคลิกขวาที่ฉันก็ได้ เมนูเดียวกัน' });
+  Object.assign(LINES.en.guide.icon, { line: 'My icon is up in the menu bar, top right.', hidden: 'Can’t see it? The menu bar may be full: hide a few icons, or right-click me, same menu.' });
+}
+
 export const ASSISTANT_NAMES = { claude: 'Claude Code', codex: 'Codex', agy: 'Antigravity' };
 const OTHERS = {
   codex: {
