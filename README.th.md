@@ -133,6 +133,10 @@ Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous 
 Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.
 
 
+### 0.14.0 — macOS (รุ่นทดลอง)
+
+ตัวแรกสำหรับ Mac (ชิป M และ Intel): ตัวละครอยู่ทุก Space, ไอคอนที่ menu bar, เสียงพูดของ macOS, Ollama, ค้นไฟล์ด้วย Spotlight, ปิดแอปและปรับเสียง ยังไม่ได้เซ็นกับ Apple ดู[วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md) ส่วนควบคุมเครื่อง โมเดลรับเสียงในเครื่อง และติดตามหน้าต่าง ยังใช้ได้เฉพาะ Windows
+
 ### 0.13.0 — ตั้งค่าทีละขั้นและหน้าตั้งค่าแบบแท็บ
 
 หน้าตั้งค่าทีละขั้นตอนเปิดครั้งแรก, เมนูคลิกขวาสั้นลง ที่เหลือย้ายไปหน้าตั้งค่าแบบแท็บ (มีตัวอย่างตัวละคร), ปุ่มล้างการตั้งค่าทั้งหมด และตัวละครบอกเมื่อมีอัปเดตพร้อมปุ่มรีสตาร์ท กับปุ่มเช็คอัปเดตในหน้าตั้งค่า
