@@ -42,10 +42,10 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
     installing = (async () => {
       if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('ตัวติดตั้งโมเดลรองรับ Windows x64');
       await fs.mkdir(directory, { recursive: true });
-      for (const [name, url, hash, max] of [ARTIFACTS[0], name === 'thai-medium' ? THAI_MODEL : ARTIFACTS[1]]) {
-        const target = path.join(directory, name), partial = `${target}.part`;
+      for (const [artifact, url, hash, max] of [ARTIFACTS[0], name === 'thai-medium' ? THAI_MODEL : ARTIFACTS[1]]) {
+        const target = path.join(directory, artifact), partial = `${target}.part`;
         if (await fs.readFile(target).then(b => createHash('sha256').update(b).digest('hex') === hash).catch(() => false)) continue;
-        progress(`ดาวน์โหลด ${name}…`);
+        progress(`ดาวน์โหลด ${artifact}…`);
         const response = await fetcher(url, { signal: AbortSignal.timeout(600000) });
         if (!response.ok) throw new Error(`ดาวน์โหลดไม่สำเร็จ (${response.status})`);
         const file = await fs.open(partial, 'w'); let size = 0; const digest = createHash('sha256');
@@ -58,7 +58,8 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
       progress('กำลังติดตั้งตัวรับเสียง…');
       await fs.mkdir(path.join(directory, 'runtime'), { recursive: true });
       // Archive is hash pinned. Pass paths as arguments, never concatenate user-controlled shell code.
-      await runner('tar.exe', ['-xf', path.join(directory, 'runtime.zip'), '-C', path.join(directory, 'runtime')], { windowsHide: true, timeout: 60000 });
+      // Windows' own tar: a GNU tar earlier on PATH (Git) reads 'C:' as a remote host.
+      await runner(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'),['-xf', path.join(directory, 'runtime.zip'), '-C', path.join(directory, 'runtime')], { windowsHide: true, timeout: 60000 });
       if (!(await info(name)).ready) throw new Error('ไม่พบ whisper-cli.exe หลังติดตั้ง');
       return { ready: true };
     })().finally(() => { installing = null; });
