@@ -28,7 +28,8 @@
     "prestart": "node scripts/vendor-voice-agent.js",
     "predev": "node scripts/vendor-voice-agent.js",
     "predist": "node scripts/vendor-voice-agent.js",
-    "predist:mac": "node scripts/vendor-voice-agent.js"
+    "predist:mac": "node scripts/vendor-voice-agent.js && npm run build:mac-helper",
+    "build:mac-helper": "mkdir -p native && swiftc -O -target arm64-apple-macos11 src/main/computer-mac.swift -o native/uncle-computer-arm64 && swiftc -O -target x86_64-apple-macos11 src/main/computer-mac.swift -o native/uncle-computer-x64 && lipo -create native/uncle-computer-arm64 native/uncle-computer-x64 -output native/uncle-computer"
   },
   "keywords": [
     "desktop-companion",
@@ -97,11 +98,12 @@
       ],
       "icon": "assets/icons/capri-512.png",
       "category": "public.app-category.entertainment",
+      "extraResources": [{ "from": "native/uncle-computer", "to": "uncle-computer" }],
       "identity": "-",
       "hardenedRuntime": false,
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Uncle Desktop listens for your voice commands when you turn the mic on.",
-        "NSAppleEventsUsageDescription": "Uncle Desktop reads which window is in front so the character can react to it."
+        "NSAppleEventsUsageDescription": "Uncle Desktop controls the volume, your music and the apps you ask her to quit."
       }
     },
     "dmg": {
