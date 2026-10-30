@@ -772,6 +772,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'mcp-confirm') { // a tool that writes, sends or deletes: your yes first
+      const actions = [{ id: 'yes', label: `อนุญาต: ${cmd.tool}${cmd.detail ? ` (${cmd.detail.slice(0, 70)})` : ''}`, primary: true }, { id: 'no', label: 'ไม่ต้อง' }];
+      const onAction = (id) => { host.mcpAnswer(cmd.id, id === 'yes'); panel.setActions([]); };
+      if (chat.open) panel.setActions(actions, onAction);
+      else panel.say({ kind: 'remind', face: 'look', line: `ให้ฉันใช้ ${cmd.tool} ไหม?`, quote: cmd.detail, actions, onAction, hold: null });
+      return;
+    }
     if (cmd.name === 'now-playing') { // her mini player: the song, its buttons; she dances while it plays
       let mp = document.getElementById('mini-player');
       if (!mp) {

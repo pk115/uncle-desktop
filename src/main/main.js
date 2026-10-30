@@ -19,6 +19,10 @@ const speech = createSpeech({ kokoroDir: () => path.join(app.getPath('userData')
 const { createListening, listeningSettings } = require('./listening');
 const { createNative, createComputer, SECURITY, SWITCHES, LEVELS } = require('./computer');
 const { TIERS, tierModel } = require('./tiers');
+const { createMcp } = require('./mcp');
+const { chatWithTools } = require('./tool-chat');
+let mcp = null; // her MCP servers (userData/mcp.json), connected once she's ready
+const mcpAsks = new Map(); // a tool waiting for your yes: id -> resolve
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
 let voiceAgentAPI, voiceAgentSession=null;
@@ -1110,7 +1114,22 @@ function registerIpc() {
         overlay?.webContents.send('chat:delta', { id, text });
       };
       const cfg = config.load();
-      const text = await chatWithFallback(cfg, messages, send, abort.signal, () => streamed);
+      const plain = (msgs, s) => chatWithFallback(cfg, msgs, s, abort.signal, () => streamed);
+      // her MCP tools (mail, calendar…): offered to the AI; one that writes asks you first
+      const tools = cfg.provider === 'claude' ? [] : mcp?.tools() || [];
+      const text = tools.length ? await chatWithTools({
+        tools, messages, send, chat: plain,
+        mayWrite: computerOptions().switches.send,
+        call: (server, name, args) => mcp.call(server, name, args, { signal: abort.signal }),
+        confirm: (tool, args) => new Promise((resolve) => {
+          const ask = randomUUID();
+          mcpAsks.set(ask, resolve);
+          const detail = Object.entries(args).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ').slice(0, 240);
+          sendCommand('mcp-confirm', { id: ask, tool: `${tool.server}/${tool.name}`, detail });
+          setTimeout(() => { if (mcpAsks.delete(ask)) resolve(false); }, 120000);
+          abort.signal.addEventListener('abort', () => { if (mcpAsks.delete(ask)) resolve(false); }, { once: true });
+        }),
+      }) : await plain(messages, send);
       if (cfg.provider === 'claude' && cfg.characterId === config.load().characterId && !abort.signal.aborted) saveMemory({ claude: llm.claudeMemory() });
       return { ok: true, text };
     } catch (err) {
@@ -1120,6 +1139,7 @@ function registerIpc() {
     }
   });
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
+  ipcMain.on('mcp:answer', (_e, { id, yes } = {}) => { const resolve = mcpAsks.get(id); if (resolve) { mcpAsks.delete(id); resolve(yes === true); } });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
   ipcMain.handle('look:snap', async () => {
     try {
@@ -1465,6 +1485,8 @@ function main() {
       setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
     }
     watchMusic();
+    mcp = createMcp({ file: path.join(app.getPath('userData'), 'mcp.json'), version: app.getVersion(), log: (line) => console.log(line) });
+    mcp.start().then(() => rebuildTray()).catch(() => {});
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
@@ -1484,6 +1506,7 @@ function main() {
   });
 
   app.on('will-quit', () => {
+    mcp?.stop();
     computer?.stop(); computerNative?.stop();
     speech.stop();
     listening?.stop();
