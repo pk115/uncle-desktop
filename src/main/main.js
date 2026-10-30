@@ -27,6 +27,21 @@ const { createJobs } = require('./jobs');
 const { createTelegram } = require('./telegram');
 const { createPhone } = require('./phone');
 const { createVibe } = require('./vibe');
+const { createNews } = require('./news');
+const { createBriefs } = require('./briefs');
+let news = null, briefs = null; // the news on your topics, and her briefs
+// her own tools, beside the MCP servers': the news, and a brief on demand (all read-only)
+const UNCLE_TOOLS = [
+  { server: 'uncle', name: 'news', description: 'Latest news headlines on a topic (Thai or English), with outlets. Use for any question about current news.', schema: { properties: { topic: { type: 'string' } }, required: ['topic'] }, readOnly: true },
+  { server: 'uncle', name: 'brief', description: "The user's day: today's meetings, important unread mail and news, as a short brief.", schema: { properties: {} }, readOnly: true },
+];
+const allTools = () => [...(mcp?.tools() || []), ...UNCLE_TOOLS];
+async function callTool(server, name, args, options) {
+  if (server !== 'uncle') return mcp.call(server, name, args, options);
+  if (name === 'news') return (await news.topic(String(args.topic || ''), { max: 8, all: true })).map((it) => `- ${it.title} (${it.source}) ${it.link}`).join('\n') || 'no news found';
+  if (name === 'brief') return briefs.dayBrief('morning');
+  throw new Error(`no tool ${name}`);
+}
 const crypto = require('node:crypto');
 const VIBE_TOKEN = crypto.randomBytes(24).toString('hex'); // only her own Vibecode jobs may ask for approvals
 let vibe = null; // Vibecode: projects and their coding agents, run from your phone
@@ -734,6 +749,26 @@ function rebuildTray() {
       { label: th ? 'แก้ไข mcp.json…' : 'Edit mcp.json…', click: () => { if (!fs.existsSync(mcp.file)) mcp.save({}); shell.openPath(mcp.file); } },
       { label: th ? 'โหลด MCP ใหม่' : 'Reload MCP servers', click: () => mcp.start().then(rebuildTray) },
     ] },
+    // the news on your topics, and her briefs
+    { id: 'news', title: th ? 'ข่าวและสรุป' : 'News & briefs', items: (() => {
+      const n = { topics: [], lang: 'th', feeds: [], alerts: [], time: '08:00', every: 0, ...cfg.news }, b = { morning: '07:30', evening: '', voice: true, ...cfg.briefs };
+      const setNews = (patch) => updateConfig({ news: { ...cfg.news, ...patch } }), setBriefs = (patch) => updateConfig({ briefs: { ...cfg.briefs, ...patch } });
+      const list = (key, title, hint) => ({ label: `${title}: ${(n[key] || []).join(', ') || (th ? 'ยังไม่มี' : 'none')}`.slice(0, 110), click: () => sendCommand('news-list', { key, title, hint, value: (n[key] || []).join(', ') }) });
+      return [
+        list('topics', th ? 'หัวข้อที่สนใจ' : 'Topics', th ? 'คั่นด้วยจุลภาค เช่น ราคาทองคำ, AI, ทีมชาติไทย' : 'comma separated'),
+        list('alerts', th ? 'คำที่เตือนทันที' : 'Breaking-news words', th ? 'เช่น แผ่นดินไหว, หุ้น PTT' : 'e.g. earthquake'),
+        list('feeds', th ? 'RSS เพิ่มเอง' : 'Your RSS feeds', th ? 'ลิงก์ RSS คั่นด้วยจุลภาค' : 'feed URLs, comma separated'),
+        list('blocked', th ? 'สำนักข่าวที่ไม่อยากเห็น' : 'Outlets to skip', th ? 'ชื่อหรือโดเมน คั่นด้วยจุลภาค' : 'names or domains'),
+        { label: th ? 'ภาษาข่าว' : 'News language', submenu: [['th', 'ไทย'], ['en', 'English'], ['both', th ? 'ทั้งสองภาษา' : 'Both']].map(([v, l]) => ({ label: l, type: 'radio', checked: n.lang === v, click: () => setNews({ lang: v }) })) },
+        { label: th ? 'สรุปข่าวเมื่อไหร่' : 'News brief', submenu: [['07:00', '07:00'], ['08:00', '08:00'], ['12:00', '12:00'], ['every3', th ? 'ทุก 3 ชั่วโมง' : 'Every 3 hours'], ['', th ? 'เมื่อสั่งเท่านั้น' : 'Only when asked']].map(([v, l]) => ({ label: l, type: 'radio', checked: v === 'every3' ? n.every === 180 : !n.every && n.time === v, click: () => setNews(v === 'every3' ? { every: 180, time: '' } : { every: 0, time: v }) })) },
+        { label: th ? 'สรุปข่าวตอนนี้' : 'News brief now', click: () => briefs.newsBrief({ asked: true }).catch((err) => notifyUser({ kind: 'error', message: err.message })) },
+        { type: 'separator' },
+        { label: th ? 'สรุปตอนเช้า (นัด เมล ข่าว)' : 'Morning brief', submenu: [['06:30', '06:30'], ['07:30', '07:30'], ['08:30', '08:30'], ['', th ? 'ปิด' : 'Off']].map(([v, l]) => ({ label: l, type: 'radio', checked: b.morning === v, click: () => setBriefs({ morning: v }) })) },
+        { label: th ? 'สรุปท้ายวัน (นัดพรุ่งนี้ เมลค้าง)' : 'Evening brief', submenu: [['17:30', '17:30'], ['18:00', '18:00'], ['20:00', '20:00'], ['', th ? 'ปิด' : 'Off']].map(([v, l]) => ({ label: l, type: 'radio', checked: b.evening === v, click: () => setBriefs({ evening: v }) })) },
+        { label: th ? 'อ่านสรุปออกเสียง' : 'Read briefs aloud', type: 'checkbox', checked: b.voice !== false, click: (it) => setBriefs({ voice: it.checked }) },
+        { label: th ? 'สรุปเช้านี้ตอนนี้' : 'Morning brief now', click: () => briefs.dayBrief('morning').catch((err) => notifyUser({ kind: 'error', message: err.message })) },
+      ];
+    })() },
     // your phone: her Telegram bot
     { id: 'phone', title: 'Telegram', items: (() => {
       const s = phoneSettings(), bot = cfg.telegram?.bot, hasToken = Boolean(setup.openKeys(cfg.apiKeys).telegram);
@@ -853,9 +888,9 @@ async function phoneAnswer({ history, text, images, confirm }) {
   const signal = AbortSignal.timeout(180000);
   const model = images.length ? modelFor('vision', cfg) : null;
   const chat = (msgs, s) => chatWithFallback({ ...cfg, chatModel: model || modelFor('tools', cfg) }, msgs, s, signal, () => false);
-  const tools = mcp?.tools() || [];
+  const tools = allTools();
   return tools.length
-    ? chatWithTools({ tools, messages, send: () => {}, chat, mayWrite: false, confirm, call: (server, name, args) => mcp.call(server, name, args, { signal }) })
+    ? chatWithTools({ tools, messages, send: () => {}, chat, mayWrite: false, confirm, call: (server, name, args) => callTool(server, name, args, { signal }) })
     : chat(messages, () => {});
 }
 // her Telegram bot, when it has a token
@@ -1338,11 +1373,11 @@ function registerIpc() {
       const plain = (msgs, s) => chatWithFallback(cfg, msgs, s, abort.signal, () => streamed);
       const withTools = (msgs, s) => chatWithFallback({ ...cfg, chatModel: modelFor('tools', cfg) }, msgs, s, abort.signal, () => streamed);
       // her MCP tools (mail, calendar…): offered to the AI; one that writes asks you first
-      const tools = cfg.provider === 'claude' ? [] : mcp?.tools() || [];
+      const tools = cfg.provider === 'claude' ? [] : allTools();
       const text = tools.length ? await chatWithTools({
         tools, messages, send, chat: withTools,
         mayWrite: computerOptions().switches.send,
-        call: (server, name, args) => mcp.call(server, name, args, { signal: abort.signal }),
+        call: (server, name, args) => callTool(server, name, args, { signal: abort.signal }),
         confirm: (tool, args) => new Promise((resolve) => {
           const ask = randomUUID();
           mcpAsks.set(ask, resolve);
@@ -1363,6 +1398,13 @@ function registerIpc() {
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
   ipcMain.on('rpc:reply', (_e, { id, ok, value, error } = {}) => { const call = rendererCalls.get(id); if (!call) return; rendererCalls.delete(id); ok ? call.resolve(value) : call.reject(new Error(error || 'ทำไม่สำเร็จ')); });
   ipcMain.handle('telegram:token', (_e, token) => setTelegramToken(token));
+  ipcMain.handle('news:set', (_e, { key, value } = {}) => {
+    if (!['topics', 'alerts', 'feeds', 'blocked'].includes(key) || typeof value !== 'string' || value.length > 2000) throw new Error('ค่าไม่ถูกต้อง');
+    const list = value.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 20);
+    if (key === 'feeds' && list.some((u) => !/^https?:\/\/\S+$/.test(u))) throw new Error('RSS ต้องเป็นลิงก์ http(s)');
+    updateConfig({ news: { ...config.load().news, [key]: list } });
+    return list;
+  });
   ipcMain.handle('telegram:pin', (_e, pin) => { if (!/^\d{4,8}$/.test(String(pin))) throw new Error('PIN ต้องเป็นตัวเลข 4–8 หลัก'); savePhone({ pin: pinHash(pin) }); return true; });
   ipcMain.on('mcp:answer', (_e, { id, yes } = {}) => { const resolve = mcpAsks.get(id); if (resolve) { mcpAsks.delete(id); resolve(yes === true); } });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
@@ -1721,6 +1763,13 @@ function main() {
     mcp.start().then(() => rebuildTray()).catch(() => {});
     personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: notifyUser, log: (line) => console.log(line) });
     personal.start();
+    const newsCfg = () => ({ topics: [], lang: 'th', feeds: [], alerts: [], blocked: [], time: '08:00', every: 0, ...config.load().news });
+    news = createNews({ getSettings: newsCfg, seenFile: path.join(app.getPath('userData'), 'news-seen.json') });
+    briefs = createBriefs({ news, mcp, ai: backgroundAI, notify: notifyUser, getConfig: () => config.load() });
+    jobs.add('news', { at: () => newsCfg().time, every: () => newsCfg().every, enabled: () => newsCfg().topics.length > 0, run: () => briefs.newsBrief() });
+    jobs.add('breaking', { every: 15, enabled: () => newsCfg().alerts.length > 0, run: () => briefs.breaking() });
+    jobs.add('morning', { at: () => config.load().briefs?.morning ?? '07:30', enabled: () => Boolean(config.load().briefs?.morning ?? '07:30'), run: () => briefs.dayBrief('morning') });
+    jobs.add('evening', { at: () => config.load().briefs?.evening ?? '', enabled: () => Boolean(config.load().briefs?.evening), run: () => briefs.dayBrief('evening') });
     jobs.start();
     startPhone();
     llm.restoreClaude(readMemory().claude);

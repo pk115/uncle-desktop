@@ -778,6 +778,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'news-list') { // a list in her News tab: topics, alert words, feeds, outlets to skip
+      const got = await guide.askText({ face: 'look', line: cmd.title, quote: cmd.hint, placeholder: cmd.value || cmd.hint });
+      if (got?.text === undefined || got?.text === null) return;
+      try { const list = await host.newsSet(cmd.key, got.text); panel.say({ kind: 'info', line: `${cmd.title}: ${list.join(', ') || '—'}`, hold: 5000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 8000 }); }
+      return;
+    }
     if (cmd.name === 'telegram-pin') { // the PIN your phone adds to risky commands (/pr 1234)
       const got = await guide.askText({ face: 'look', line: 'ตั้ง PIN 4–8 หลัก', quote: 'ใช้ต่อท้ายคำสั่งเสี่ยงจาก Telegram เช่น /pr 1234 · เก็บแบบแฮช ไม่เก็บตัวเลขจริง', secret: true, placeholder: '1234' });
       if (!got?.text) return;
@@ -799,6 +806,12 @@ async function boot() {
         const line = cmd.kind === 'mail' ? `📧 เมลสำคัญจาก ${cmd.from.replace(/<[^>]*>/, '').trim() || 'ไม่ทราบชื่อ'}` : `📅 อีก ${cmd.minutes} นาที: ${cmd.summary}`;
         const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), { id: 'ok', label: 'รับทราบ' }];
         panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : '', actions, onAction: (id) => { if (id === 'open') host.openSite(link); panel.hide(); }, hold: null });
+      } else if (cmd.kind === 'news' || cmd.kind === 'brief') { // a summary: in her bubble, and aloud if you like
+        voice.play('remind'); capri.wake();
+        const first = cmd.link || cmd.links?.[0]?.link;
+        const actions = [{ id: 'read', label: 'อ่านให้ฟัง' }, ...(first ? [{ id: 'open', label: 'เปิดข่าว' }] : []), { id: 'ok', label: 'รับทราบ', primary: true }];
+        panel.say({ kind: 'remind', face: 'smug', line: cmd.title, quote: cmd.text, actions, hold: null, onAction: (id) => { if (id === 'read') speechUI.play(`${cmd.title.replace(/^\W+/u, '')}. ${cmd.text}`).catch(() => {}); else if (id === 'open') host.openSite(first); if (id !== 'read') panel.hide(); } });
+        if (cmd.kind === 'brief' && (await host.getConfig()).briefs?.voice !== false) speechUI.play(cmd.text).catch(() => {});
       } else panel.say({ kind: cmd.kind === 'error' ? 'error' : 'info', line: cmd.message, hold: cmd.kind === 'error' ? 9000 : 6000 });
       return;
     }

@@ -142,7 +142,7 @@ function createPhone({ telegram, settings, answer, transcribe, speak, media, cod
     const link = /^https:\/\//.test(alert.link || '') ? alert.link : '';
     const text = alert.kind === 'mail' ? `📧 เมลสำคัญจาก ${alert.from}\n${alert.subject}`
       : alert.kind === 'event' ? `📅 อีก ${alert.minutes} นาที: ${alert.summary}`
-        : alert.kind === 'news' ? `📰 ${alert.title}\n${alert.text || ''}`
+        : alert.kind === 'news' || alert.kind === 'brief' ? `${alert.title}\n${alert.text || ''}${alert.links?.length ? `\n\n${alert.links.map((l) => `• ${l.title}\n${l.link}`).join('\n')}` : ''}`
           : alert.kind === 'agent' ? `🤖 ${alert.message}`
             : `${alert.kind === 'error' ? '⚠️' : '💬'} ${alert.message || alert.text || ''}`;
     await telegram.send(chatId, text, link ? [[{ text: alert.kind === 'mail' ? 'เปิดเมล' : alert.kind === 'event' ? 'เข้าประชุม' : 'เปิด', url: link }]] : undefined);
