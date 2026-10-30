@@ -310,6 +310,8 @@ function createOverlay() {
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // macOS: on every Space, over full-screen apps too, as she is over everything on Windows
+  if (process.platform === 'darwin') overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
   // always shown: put away, she's still there as her biochip in the corner. Sized again first:
   // Windows keeps a new window inside the work area, and resting on the taskbar it covers it too.
@@ -843,7 +845,8 @@ async function pickClaudeFolder() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
+  let icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
+  if (process.platform === 'darwin') icon = icon.resize({ height: 18 }); // the menu bar's size
   tray = new Tray(icon);
   tray.setToolTip('Uncle Desktop');
   tray.on('click', () => sendCommand('status'));
@@ -1369,6 +1372,7 @@ function main() {
   }
   app.on('second-instance', () => sendCommand('status'));
   if (process.platform === 'win32') app.setAppUserModelId('uncle.desktop');
+  if (process.platform === 'darwin') app.dock?.hide(); // she lives in the menu bar, as in the Windows tray
 
   app.whenReady().then(() => {
     userCharacters = createUserCharacters(path.join(app.getPath('userData'), 'characters'), nativeImage, CHARACTERS);
