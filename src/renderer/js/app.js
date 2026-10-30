@@ -145,9 +145,10 @@ async function boot() {
     const onSpeech = !stop.hidden && mouse.x >= s.left && mouse.x <= s.right && mouse.y >= s.top && mouse.y <= s.bottom;
     const micStop = document.getElementById('listening-stop'); const micRect = micStop.getBoundingClientRect();
     const onMic = !micStop.hidden && mouse.x >= micRect.left && mouse.x <= micRect.right && mouse.y >= micRect.top && mouse.y <= micRect.bottom;
+    const mp=document.getElementById('mini-player'), mpRect=mp?.getBoundingClientRect();const onPlayer=mp&&!mp.hidden&&mouse.x>=mpRect.left&&mouse.x<=mpRect.right&&mouse.y>=mpRect.top&&mouse.y<=mpRect.bottom;
     const pcStop=document.getElementById('computer-stop'), pcRect=pcStop.getBoundingClientRect();const onComputer=!pcStop.hidden&&mouse.x>=pcRect.left&&mouse.x<=pcRect.right&&mouse.y>=pcRect.top&&mouse.y<=pcRect.bottom;
     document.body.style.cursor = onChip() ? 'pointer' : '';
-    return setInteractive(Boolean(onPanel || onSpeech || onMic || onComputer || capri.hit(mouse.x, mouse.y) || onChip()));
+    return setInteractive(Boolean(onPanel || onSpeech || onMic || onComputer || onPlayer || capri.hit(mouse.x, mouse.y) || onChip()));
   };
   // Her biochip: her eyes on it follow the pointer over it, and she comes out when you click it
   // (only then, so the pointer passing through that corner doesn't call her back).
@@ -763,6 +764,22 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'now-playing') { // her mini player: the song, its buttons; she dances while it plays
+      let mp = document.getElementById('mini-player');
+      if (!mp) {
+        mp = document.createElement('div'); mp.id = 'mini-player'; mp.setAttribute('role', 'region'); mp.setAttribute('aria-label', 'มินิเพลเยอร์');
+        mp.innerHTML = '<span class="mp-note" aria-hidden="true">♪</span><span class="mp-text"></span><button type="button" data-a="previous" aria-label="เพลงก่อนหน้า">⏮</button><button type="button" data-a="pause" aria-label="เล่นหรือหยุด">⏯</button><button type="button" data-a="next" aria-label="เพลงถัดไป">⏭</button>';
+        for (const ev of ['mousedown', 'mouseup', 'click']) mp.addEventListener(ev, (e) => e.stopPropagation());
+        mp.addEventListener('click', (e) => { const a = e.target.dataset?.a; if (a) host.media(a); });
+        document.body.append(mp);
+      }
+      const on = Boolean(cmd.title), playing = on && /play/i.test(cmd.status || '');
+      mp.hidden = !on; mp.classList.toggle('is-playing', playing);
+      mp.querySelector('.mp-text').textContent = on ? `${cmd.title}${cmd.artist ? ` — ${cmd.artist}` : ''}` : '';
+      clearInterval(window.__uncleMusicDance);
+      if (playing) window.__uncleMusicDance = setInterval(() => { if (!capri.busy && !capri.act && !capri.dragging && !capri.hidden && !capri.stowed && !capri.dormant) capri.perform('hop'); }, 1500);
+      return;
+    }
     if (cmd.name === 'computer-cursor') { // her own cursor glides there just before she clicks
       let c = document.getElementById('her-cursor');
       if (!c) { c = document.createElement('div'); c.id = 'her-cursor'; c.setAttribute('aria-hidden', 'true'); document.body.append(c); }

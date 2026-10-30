@@ -53,6 +53,18 @@ let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
+// her mini player: what's playing (Spotify, a browser, any player Windows or macOS knows), every few
+// seconds, through a computer helper of its own; she hears of it only when it changes
+let playerNative = null, lastPlaying = '';
+function watchMusic() {
+  setInterval(async () => {
+    if (config.load().miniPlayer === false || !overlay) { if (lastPlaying) { lastPlaying = ''; sendCommand('now-playing', {}); } return; }
+    playerNative ||= createNative();
+    const info = await playerNative.request({ action: 'now_playing' }).catch(() => null);
+    const now = JSON.stringify(info?.title ? { title: info.title, artist: info.artist || '', status: info.status } : {});
+    if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+  }, 4000).unref();
+}
 const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
 // a.b.c newer than x.y.z
 const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); const i = [0, 1, 2].find((k) => (x[k] || 0) !== (y[k] || 0)); return i !== undefined && (x[i] || 0) > (y[i] || 0); };
@@ -645,7 +657,7 @@ function rebuildTray() {
       { label: th ? 'ไมค์ คำเรียก และ ElevenLabs…' : 'Mic, wake phrase and ElevenLabs…', click: () => sendCommand('listening') },
       ...item.sound.submenu,
     ] },
-    { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
+    { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, { label: th ? 'มินิเพลเยอร์ และเต้นตามเพลง' : 'Mini player, and dancing to music', type: 'checkbox', checked: cfg.miniPlayer !== false, click: (it) => updateConfig({ miniPlayer: it.checked }) }, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
     { id: 'agents', title: 'Coding AI', items: [
       item.watch,
       ...(cfg.claude ? [
@@ -1445,6 +1457,7 @@ function main() {
       checkUpdate();
       setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
     }
+    watchMusic();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
