@@ -52,6 +52,17 @@ let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
+const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
+// a.b.c newer than x.y.z
+const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); const i = [0, 1, 2].find((k) => (x[k] || 0) !== (y[k] || 0)); return i !== undefined && (x[i] || 0) > (y[i] || 0); };
+// macOS: the latest release's version; newer than hers, she tells you (and it's yours to download)
+async function macUpdateCheck() {
+  const res = await fetch('https://api.github.com/repos/pk115/uncle-desktop/releases/latest', { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const latest = String((await res.json()).tag_name || '').replace(/^v/, '');
+  if (latest && newer(latest, app.getVersion())) sendCommand('update', { version: latest, download: true });
+  return latest || null;
+}
 let settingsGroups = []; // the settings rebuildTray lays out, for her settings dialog's tabs
 let settingsClicks = []; // their handlers, by the id menu:groups gave each
 let demoTimer = null;
@@ -1002,13 +1013,14 @@ function registerIpc() {
   ipcMain.handle('config:get', () => rendererConfig());
   ipcMain.handle('hooks:status', () => activeHooks().status());
   ipcMain.handle('config:set', (_e, patch) => updateConfig(patch));
-  // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
   ipcMain.handle('update:check', async () => {
-    if (!updater) return { version: app.getVersion(), latest: null };
+    if (!app.isPackaged) return { version: app.getVersion(), latest: null };
+    if (process.platform === 'darwin') return { version: app.getVersion(), latest: await macUpdateCheck(), manual: true };
     const r = await updater.checkForUpdates();
     return { version: app.getVersion(), latest: r?.updateInfo?.version || null };
   });
-  ipcMain.handle('update:install', () => updater?.quitAndInstall());
+  ipcMain.handle('update:install', () => (process.platform === 'darwin' ? shell.openExternal(RELEASES) : updater?.quitAndInstall()));
+  // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
   ipcMain.handle('config:reset', () => {
     speech.stop(); listening?.stop(); computer?.stop(); voiceAgentAPI?.stop(); voiceAgentSession = null;
     config.reset();
@@ -1402,7 +1414,12 @@ function main() {
     const taken = registerHotkeys();
     if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
     // Installed copies update from GitHub Releases: downloaded quietly, she tells you, installed now or when she quits.
-    if (app.isPackaged) {
+    // A Mac copy isn't signed by Apple, so it can't update itself: she tells you, you download it.
+    if (app.isPackaged && process.platform === 'darwin') {
+      const checkUpdate = () => macUpdateCheck().catch((err) => console.warn('[uncle] update check failed:', err.message));
+      checkUpdate();
+      setInterval(checkUpdate, 6 * 60 * 60 * 1000);
+    } else if (app.isPackaged) {
       updater = require('electron-updater').autoUpdater;
       updater.on('update-downloaded', (info) => sendCommand('update', { version: info.version }));
       const checkUpdate = () => updater.checkForUpdates().catch((err) => console.warn('[uncle] update check failed:', err.message));

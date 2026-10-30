@@ -328,9 +328,9 @@ export class Settings {
     const check = button('เช็คอัปเดตตอนนี้', async () => {
       check.disabled = true; updateNote.textContent = 'กำลังเช็ค…';
       try {
-        const { version, latest } = await this.host.checkUpdate();
+        const { version, latest, manual } = await this.host.checkUpdate();
         updateNote.textContent = !latest ? `เวอร์ชัน ${version} · เช็คได้เฉพาะตัวที่ติดตั้งจาก installer`
-          : latest === version ? `เวอร์ชัน ${version} · ล่าสุดแล้ว` : `เวอร์ชัน ${version} · เจอ ${latest} กำลังดาวน์โหลด เสร็จแล้วตัวละครจะบอก`;
+          : latest === version ? `เวอร์ชัน ${version} · ล่าสุดแล้ว` : manual ? `เวอร์ชัน ${version} · มี ${latest} แล้ว ตัวละครจะพาไปหน้าดาวน์โหลด` : `เวอร์ชัน ${version} · เจอ ${latest} กำลังดาวน์โหลด เสร็จแล้วตัวละครจะบอก`;
       } catch (err) { updateNote.textContent = `เช็คไม่สำเร็จ: ${err.message}`; }
       check.disabled = false;
     });
