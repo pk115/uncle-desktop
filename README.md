@@ -122,6 +122,10 @@ Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous 
 Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.
 
 
+### 0.16.0 — A bolder agent
+
+Four security levels for computer control (Lockdown, Guarded, Trusted, Blackwall), talking to her while she works, several apps in one ask, game keys (hold one, press another), and her own neon cursor that shows where she is about to click. On Windows and Mac.
+
 ### 0.15.0 — The Windows features on a Mac
 
 On macOS she now sits on your windows, controls the computer (Accessibility), runs the local speech model (whisper-cpp from Homebrew, on Metal), plays/pauses Spotify or Music and lists Steam games. See [the Mac install guide](docs/INSTALL_MAC_TH.md) for the permissions each needs.

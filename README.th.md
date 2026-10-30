@@ -133,6 +133,10 @@ Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous 
 Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.
 
 
+### 0.16.0 — Agent ที่เก่งขึ้น
+
+ความปลอดภัย 4 ระดับสำหรับควบคุมเครื่อง (Lockdown, Guarded, Trusted, Blackwall), พูดแทรกระหว่างทำงานได้, เปิดหลายแอปในประโยคเดียว, ปุ่มสำหรับเกม (กดค้างปุ่มหนึ่งแล้วกดอีกปุ่ม) และเคอร์เซอร์นีออนของตัวละครที่แสดงว่ากำลังจะคลิกตรงไหน ทั้ง Windows และ Mac
+
 ### 0.15.0 — ฟีเจอร์ Windows บน Mac
 
 บน macOS ตัวละครนั่งบนหน้าต่างได้, ควบคุมเครื่องได้ (Accessibility), ใช้โมเดลรับเสียงในเครื่อง (whisper-cpp ผ่าน Homebrew ใช้ชิปกราฟิก), เล่น/หยุดเพลงใน Spotify หรือ Music และเห็นเกม Steam ดูสิทธิ์ที่ต้องอนุญาตใน[วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md)
