@@ -62,3 +62,12 @@ test('mouth levels stay shut on silence and open with loudness, whatever the voi
   assert.deepEqual(soft, loud);
   assert.deepEqual(mouthLevels(new Float32Array(rate), rate), new Array(12).fill(0));
 });
+
+test('parseSayVoices reads macOS say -v ? into the Windows voice shape', () => {
+  const { parseSayVoices } = require('../src/main/speech');
+  const out = 'Kanya               th_TH    # สวัสดี ฉันชื่อ Kanya\nEddy (English (US)) en_US    # Hello! My name is Eddy.\n\n';
+  assert.deepEqual(parseSayVoices(out), [
+    { id: 'Kanya', name: 'Kanya', lang: 'th-TH' },
+    { id: 'Eddy (English (US))', name: 'Eddy (English (US))', lang: 'en-US' },
+  ]);
+});

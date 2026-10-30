@@ -2,7 +2,7 @@
 
 // Opening things when you ask her to (chat.js): an app from the Start menu (Store apps like Spotify
 // included), a Steam or Epic game, your music (the media keys: pause, next…, so it works with
-// Spotify and most players), a Spotify search, or a website. Windows only.
+// Spotify and most players), a Spotify search, or a website. Windows; on macOS, apps and volume.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,6 +12,7 @@ const { app, shell } = require('electron');
 const { powershell } = require('./apps');
 
 const WIN = process.platform === 'win32';
+const MAC = process.platform === 'darwin';
 // not things to open from a chat: uninstallers, help pages and the like
 const SKIP = /uninstall|désinstaller|desinstalar|deinstall|readme|documentation|release notes|support center|website|manual/i;
 const STEAM_SKIP = /redistributable|dedicated server|steamworks/i;
@@ -27,6 +28,13 @@ const words = (text) => plain(text).split(/[^\p{L}\p{N}]+/u).filter((w) => w.len
 // Everything she can open: [{ name, kind: 'app' | 'steam' | 'epic', id }]
 async function launchables() {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.items;
+  if (MAC) { // the .app bundles in the Applications folders: opened by their path
+    const dirs = ['/Applications', '/System/Applications', '/System/Applications/Utilities', path.join(app.getPath('home'), 'Applications')];
+    const items = dirs.flatMap((dir) => { try { return fs.readdirSync(dir).filter((n) => n.endsWith('.app')).map((n) => ({ name: n.slice(0, -4), kind: 'app', id: path.join(dir, n) })); } catch { return []; } })
+      .filter((item) => !SKIP.test(item.name));
+    cache = { at: Date.now(), items };
+    return items;
+  }
   if (!WIN) return [];
   const items = [];
   const seen = new Set();
@@ -172,6 +180,8 @@ function knownFolder(text) {
 }
 
 function openKnown(id) {
+  if (MAC && id === 'explorer') return shell.openPath(app.getPath('home')); // Finder
+  if (MAC && id === 'recycle') return shell.openPath(path.join(app.getPath('home'), '.Trash'));
   if (id === 'explorer') return spawn('explorer.exe', [], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
   if (id === 'recycle') return spawn('explorer.exe', ['shell:RecycleBinFolder'], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
   return shell.openPath(app.getPath(id));
@@ -201,6 +211,7 @@ async function launch({ kind, id } = {}) {
   if (!item) throw new Error('not found');
   if (kind === 'steam') return shell.openExternal(`steam://rungameid/${id}`);
   if (kind === 'epic') return shell.openExternal(`com.epicgames.launcher://apps/${encodeURIComponent(id)}?action=launch&silent=true`);
+  if (MAC) { const err = await shell.openPath(id); if (err) throw new Error(err); return undefined; }
   spawn('explorer.exe', [`shell:AppsFolder\\${id}`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
   return undefined;
 }
@@ -213,6 +224,12 @@ const KEY_DOWN = 1; // KEYEVENTF_EXTENDEDKEY
 const KEY_UP = 3;   // ...and KEYEVENTF_KEYUP
 
 async function media(action) {
+  if (MAC) { // the volume through AppleScript; play/pause has no system-wide command there
+    const step = { volup: '+ 10', voldown: '- 10' }[action];
+    const script = step ? `set volume output volume ((output volume of (get volume settings)) ${step})`
+      : action === 'mute' ? 'set volume output muted (not (output muted of (get volume settings)))' : null;
+    return script ? new Promise((r) => execFile('osascript', ['-e', script], (err) => r(!err))) : false;
+  }
   if (!WIN || !MEDIA[action]) return false;
   const [key, times] = MEDIA[action];
   return powershell(

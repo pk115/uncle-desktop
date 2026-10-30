@@ -39,6 +39,7 @@ function which(cmd) {
 
 // Ollama's own app (it runs the server from the tray) and its command, where its installer puts them
 function ollamaFiles() {
+  if (process.platform === 'darwin') return { app: '/Applications/Ollama.app', cli: '/Applications/Ollama.app/Contents/Resources/ollama' };
   const dir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'Ollama');
   return { app: path.join(dir, 'ollama app.exe'), cli: path.join(dir, 'ollama.exe') };
 }
@@ -71,7 +72,7 @@ function installOllama(onLine) {
 async function startOllama() {
   const { app, cli } = ollamaFiles();
   const run = (file, args) => spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref();
-  if (fs.existsSync(app)) run(app, []);
+  if (fs.existsSync(app)) process.platform === 'darwin' ? run('open', ['-a', app]) : run(app, []);
   else run(fs.existsSync(cli) ? cli : 'ollama', ['serve']);
   for (let i = 0; i < 40; i++) {
     if (await ollama.models().catch(() => null)) return { ok: true };
@@ -118,8 +119,14 @@ async function pullModel(name, onProgress, signal) {
 // Claude Code (or Codex) through Ollama, in a window of its own: Ollama fetches what's missing and
 // asks which model to use. She sees it like any other session, through her hooks.
 function launchThroughOllama(integration) {
-  if (!WIN || !['claude', 'codex'].includes(integration)) return { ok: false };
+  if (!['claude', 'codex'].includes(integration)) return { ok: false };
   const { cli } = ollamaFiles();
+  if (process.platform === 'darwin') { // a new Terminal window; the path quoted for the shell inside AppleScript's string
+    const command = `'${fs.existsSync(cli) ? cli : 'ollama'}' launch ${integration}`;
+    spawn('osascript', ['-e', `tell application "Terminal" to do script "${command}"`, '-e', 'tell application "Terminal" to activate'], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    return { ok: true };
+  }
+  if (!WIN) return { ok: false };
   // `start` opens a new console window (its first quoted argument is the window's title); cmd /k
   // strips the outer quotes of what follows, so a path with spaces in it keeps its own
   const command = `""${fs.existsSync(cli) ? cli : 'ollama'}" launch ${integration}"`;

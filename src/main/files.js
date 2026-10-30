@@ -7,6 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { app, shell, desktopCapturer, screen } = require('electron');
+const { execFile } = require('node:child_process');
 const { powershell } = require('./apps');
 
 const LIMIT = 8;
@@ -16,7 +17,7 @@ const words = (query) => String(query || '').toLowerCase().normalize('NFKD').rep
   .split(/[^\p{L}\p{N}.]+/u).filter((w) => w.length >= 2).slice(0, 5);
 
 // never in the results: code dependencies, app data, git internals
-const JUNK = ['node_modules', '\\AppData\\', '\\.git\\', '\\site-packages\\', '\\$Recycle.Bin\\'];
+const JUNK = ['node_modules', '\\AppData\\', '\\.git\\', '\\site-packages\\', '\\$Recycle.Bin\\', '/Library/', '/.git/', '/.Trash/'];
 const junk = (p) => JUNK.some((j) => p.includes(j));
 // files that are code, left out of a search by what's inside (any word shows up in some library)
 const CODE = ['js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'json', 'map', 'lock', 'yml', 'yaml', 'py', 'css', 'html', 'md', 'txt', 'xml', 'log'];
@@ -27,6 +28,11 @@ async function indexed(terms, exts) {
   const safe = terms.map((t) => t.replace(/[^\p{L}\p{N}.]/gu, '')).filter(Boolean);
   const types = exts.map((e) => e.replace(/[^a-z0-9]/gi, '')).filter(Boolean);
   if (!safe.length && !types.length) return [];
+  if (process.platform === 'darwin') { // Spotlight, by name: every word in it, of one of `exts` if any
+    const q = [...safe.map((t) => `kMDItemFSName == "*${t}*"cd`), ...(types.length ? [`(${types.map((e) => `kMDItemFSName == "*.${e}"c`).join(' || ')})`] : [])].join(' && ');
+    const out = await new Promise((r) => execFile('mdfind', ['-onlyin', app.getPath('home'), q], { timeout: 10000 }, (err, o) => r(err ? null : o)));
+    return out == null ? null : out.split('\n').filter(Boolean).slice(0, LIMIT * 3);
+  }
   const scope = `file:${app.getPath('home')}`; // backslashes: with slashes the index finds nothing
   const notJunk = "NOT System.ItemUrl LIKE '%node_modules%' AND NOT System.ItemUrl LIKE '%/AppData/%' AND NOT System.ItemUrl LIKE '%/.git/%'";
   const ofType = types.length ? `(${types.map((e) => `System.FileExtension = '.${e}'`).join(' OR ')})` : '';

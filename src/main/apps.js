@@ -2,7 +2,7 @@
 
 // Closing an app when you ask her to (chat.js), after you've confirmed with a click. The apps with
 // a window, by name; closing one the way its own close button does (it can still ask you to save),
-// and only if you ask again, forcing it. Windows only.
+// and only if you ask again, forcing it. Windows, and macOS through System Events.
 
 const { execFile } = require('node:child_process');
 
@@ -22,8 +22,14 @@ function powershell(script, timeout = 15000) {
   });
 }
 
+const osascript = (script) => new Promise((resolve, reject) => execFile('osascript', ['-e', script], { timeout: 15000 }, (err, out) => (err ? reject(err) : resolve(out.trim()))));
+
 // [{ name, process, ids }]: one per program with a window open ("AM Music", "Discord"...)
 async function list() {
+  if (process.platform === 'darwin') { // the apps in the Dock (not background ones); macOS asks once to allow System Events
+    const out = await osascript('tell application "System Events" to get name of (processes where background only is false)');
+    return out.split(', ').filter((n) => n && !KEEP.has(n.toLowerCase()) && !['finder', 'uncle desktop'].includes(n.toLowerCase())).map((name) => ({ name, process: name, label: '', ids: [] }));
+  }
   if (process.platform !== 'win32') return [];
   const out = await powershell(
     'Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle } | '
@@ -64,6 +70,12 @@ async function find(wanted) {
 async function close(name, { force = false } = {}) {
   const app = (await list()).find((a) => a.process === name);
   if (!app) return { running: false };
+  if (process.platform === 'darwin') { // quit like ⌘Q (it can still ask to save), or force it
+    const quoted = name.replace(/["\\]/g, '');
+    await (force ? new Promise((r) => execFile('pkill', ['-x', quoted], () => r())) : osascript(`tell application "${quoted}" to quit`).catch(() => {}));
+    await new Promise((r) => setTimeout(r, force ? 600 : 2500));
+    return { running: (await list()).some((a) => a.process === name) };
+  }
   const ids = app.ids.join(',');
   const out = await powershell(force
     ? `Stop-Process -Id ${ids} -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 600; `

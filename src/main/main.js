@@ -1372,6 +1372,8 @@ function main() {
   }
   app.on('second-instance', () => sendCommand('status'));
   if (process.platform === 'win32') app.setAppUserModelId('uncle.desktop');
+  // opened from Finder, a Mac app gets a bare PATH: where Homebrew and installers put ollama, claude, codex
+  if (process.platform === 'darwin') process.env.PATH = ['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin'), process.env.PATH].join(':');
   if (process.platform === 'darwin') app.dock?.hide(); // she lives in the menu bar, as in the Windows tray
 
   app.whenReady().then(() => {
