@@ -24,7 +24,7 @@ const node = (tag, text = '') => { const el = document.createElement(tag); el.te
 export class Speech {
   constructor({ host, root, stopButton, onVisibility, lastReply }) {
     Object.assign(this, { host, root, stopButton, onVisibility, lastReply });
-    this.settings = { provider: 'windows', voice: '', volume: 0.7, rate: 1, auto: false, cloudConsent: false };
+    this.settings = { provider: 'windows', voice: '', volume: 0.7, rate: 1, auto: false, cloudConsent: false, customUrl: '', customModel: '', pitch: 0, robot: 0, glitch: 0, layers: false };
     this.serial = 0;
     root.className = 'character-picker'; root.hidden = true;
     const box = node('div'); box.className = 'character-picker__box speech-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'speech-title');
@@ -32,7 +32,7 @@ export class Speech {
     const close = node('button', '✕'); close.type = 'button'; close.className = 'speech-close'; close.setAttribute('aria-label', 'ปิดหน้าตั้งค่าเสียง'); close.onclick = () => this.hide();
     const providerLabel = node('label', 'เลือกบริการเสียง');
     this.provider = node('select'); this.provider.id = 'speech-provider'; providerLabel.htmlFor = this.provider.id;
-    for (const [id, label] of [['edge', 'เสียงไทย Edge — ออนไลน์ ไม่ต้องใส่คีย์'], ['windows', 'Windows — อ่านในเครื่อง ใช้เสียงที่ติดตั้งไว้'], ['openai', 'OpenAI — เสียง AI ออนไลน์']]) { const option = node('option', label); option.value = id; this.provider.append(option); }
+    for (const [id, label] of [['edge', 'เสียงไทย Edge — ออนไลน์ ไม่ต้องใส่คีย์'], ['windows', 'เสียงของเครื่อง (Windows / macOS) — อ่านในเครื่อง'], ['kokoro', 'Kokoro — เสียง AI ฟรีในเครื่อง (ยังไม่มีภาษาไทย)'], ['openai', 'OpenAI — เสียง AI ออนไลน์'], ['elevenlabs', 'ElevenLabs — เสียง AI ออนไลน์ รองรับไทย'], ['fish', 'Fish Audio — เสียง AI ออนไลน์ / เสียงที่โคลนไว้'], ['custom', 'เซิร์ฟเวอร์หรือโมเดลเสียงของคุณ (OpenAI-compatible)']]) { const option = node('option', label); option.value = id; this.provider.append(option); }
     this.voice = node('select'); this.voice.id = 'speech-voice';
     const voiceLabel = node('label', 'เสียงที่ใช้'); voiceLabel.htmlFor = this.voice.id;
     this.note = node('p');
@@ -48,7 +48,25 @@ export class Speech {
     this.consentCaption = document.createTextNode(' ยินยอมส่งข้อความที่อ่านไป OpenAI และรับทราบว่าอาจมีค่าบริการ API');
     const consentLabel = node('label'); consentLabel.htmlFor = this.consent.id; consentLabel.append(this.consent, this.consentCaption);
     this.cloudNote = node('p');
-    this.cloud.append(keyLabel, this.key, consentLabel, this.cloudNote);
+    // ElevenLabs, Fish and your own server: a voice ID you paste; your server: its address and model
+    this.voiceId = node('input'); this.voiceId.id = 'speech-voice-id'; this.voiceId.maxLength = 300;
+    this.voiceIdLabel = node('label', 'Voice ID'); this.voiceIdLabel.htmlFor = this.voiceId.id;
+    this.customUrl = node('input'); this.customUrl.id = 'speech-custom-url'; this.customUrl.maxLength = 500; this.customUrl.placeholder = 'เช่น http://localhost:8880 (Kokoro-FastAPI) หรือ https://…';
+    this.customModel = node('input'); this.customModel.id = 'speech-custom-model'; this.customModel.maxLength = 100; this.customModel.placeholder = 'ชื่อโมเดล เช่น kokoro หรือ tts-1';
+    this.custom = node('div');
+    const urlLabel = node('label', 'ที่อยู่เซิร์ฟเวอร์เสียง'); urlLabel.htmlFor = this.customUrl.id;
+    const modelLabel = node('label', 'ชื่อโมเดล'); modelLabel.htmlFor = this.customModel.id;
+    this.custom.append(urlLabel, this.customUrl, modelLabel, this.customModel);
+    this.cloud.append(this.voiceIdLabel, this.voiceId, this.custom, keyLabel, this.key, consentLabel, this.cloudNote);
+    // her voice, tuned: pitch, robot, glitch, and two more copies of it, one higher and one lower
+    this.effects = node('details'); this.effects.append(node('summary', 'ปรับเสียง — pitch, robot, glitch, ซ้อนเสียง'));
+    const slider = (id, label, min, max, step) => { const input = node('input'); input.type = 'range'; input.id = `speech-${id}`; Object.assign(input, { min, max, step }); const l = node('label', label); l.htmlFor = input.id; this.effects.append(l, input); return input; };
+    this.pitch = slider('pitch', 'Pitch (สูง–ต่ำ)', -12, 12, 1);
+    this.robot = slider('robot', 'Robot', 0, 1, 0.05);
+    this.glitch = slider('glitch', 'Glitch', 0, 1, 0.05);
+    this.layers = node('input'); this.layers.type = 'checkbox'; this.layers.id = 'speech-layers';
+    const layersLabel = node('label'); layersLabel.htmlFor = this.layers.id; layersLabel.append(this.layers, document.createTextNode(' ซ้อนเสียง — เพิ่มเสียงตัวเองอีกสองชั้น สูงหนึ่ง ต่ำหนึ่ง'));
+    this.effects.append(layersLabel);
     this.volume = node('input'); this.volume.id = 'speech-volume'; this.volume.type = 'range'; this.volume.min = 0; this.volume.max = 1; this.volume.step = 0.05;
     const volumeLabel = node('label', 'ระดับเสียงพูด'); volumeLabel.htmlFor = this.volume.id;
     this.volume.oninput = () => { if (this.gain) this.gain.gain.value = Number(this.volume.value); };
@@ -66,7 +84,8 @@ export class Speech {
     const stop = node('button', '■ หยุดเสียง'); stop.onclick = () => this.stop();
     const save = node('button', 'บันทึก'); save.className = 'character-picker__apply'; save.onclick = async () => { try { await this.save(); this.status.textContent = 'บันทึกการตั้งค่าแล้ว'; } catch (error) { this.error(error); } };
     actions.append(this.test, read, stop, save);
-    box.append(title, close, providerLabel, this.provider, voiceLabel, this.voice, this.note, this.local, this.cloud, volumeLabel, this.volume, rateLabel, this.rate, autoLabel, sampleLabel, this.sample, this.status, actions);
+    this.voiceLabel = voiceLabel;
+    box.append(title, close, providerLabel, this.provider, voiceLabel, this.voice, this.note, this.local, this.cloud, volumeLabel, this.volume, rateLabel, this.rate, this.effects, autoLabel, sampleLabel, this.sample, this.status, actions);
     root.replaceChildren(box);
     this.provider.onchange = () => { this.stop(); this.key.value = ''; this.consent.checked = false; this.renderVoices(); };
     for (const event of ['mousedown', 'mouseup', 'click']) root.addEventListener(event, (e) => e.stopPropagation());
@@ -94,30 +113,42 @@ export class Speech {
       this.info = await this.host.speechInfo(refresh); this.settings = this.info.settings;
       this.provider.value = this.settings.provider; this.volume.value = this.settings.volume; this.rate.value = this.settings.rate;
       this.auto.checked = this.settings.auto; this.consent.checked = this.settings.cloudConsent; this.key.value = '';
+      this.customUrl.value = this.settings.customUrl || ''; this.customModel.value = this.settings.customModel || ''; this.voiceId.value = ['elevenlabs', 'fish', 'custom'].includes(this.settings.provider) ? this.settings.voice : '';
+      this.pitch.value = this.settings.pitch || 0; this.robot.value = this.settings.robot || 0; this.glitch.value = this.settings.glitch || 0; this.layers.checked = Boolean(this.settings.layers);
       this.renderVoices();
     } catch (error) { this.error(error); }
   }
   renderVoices() {
     if (!this.info) return;
-    const local = this.provider.value === 'windows';
-    const edge = this.provider.value === 'edge';
-    this.local.hidden = !local; this.cloud.hidden = local;
+    const p = this.provider.value, local = p === 'windows', edge = p === 'edge', kokoro = p === 'kokoro', typed = ['elevenlabs', 'fish', 'custom'].includes(p);
+    const NAME = { openai: 'OpenAI', elevenlabs: 'ElevenLabs', fish: 'Fish Audio', custom: 'เซิร์ฟเวอร์เสียงของคุณ' }[p];
+    this.local.hidden = !local; this.cloud.hidden = local || kokoro;
+    this.voice.hidden = typed; this.voiceLabel.hidden = typed; this.voiceId.hidden = !typed; this.voiceIdLabel.hidden = !typed; this.custom.hidden = p !== 'custom';
     this.key.hidden = edge; this.keyLabel.hidden = edge;
-    this.consentCaption.textContent = edge ? ' ยินยอมส่งข้อความที่อ่านไป Microsoft Edge TTS เพื่อสร้างเสียงไทยออนไลน์' : ' ยินยอมส่งข้อความที่อ่านไป OpenAI และรับทราบว่าอาจมีค่าบริการ API';
-    this.cloudNote.textContent = edge ? 'มีเสียงไทยชายและหญิงให้เลือกทันที ไม่ต้องติดตั้งเสียง Windows หรือใส่คีย์ ต้องใช้อินเทอร์เน็ตและบริการภายนอก อาจใช้งานไม่ได้เมื่อบริการเปลี่ยน ไม่ส่งเสียงไมค์หรือภาพหน้าจอผ่าน TTS' : 'เสียงสร้างโดย AI ใช้เฉพาะข้อความที่สั่งให้อ่าน ไม่ส่งเสียงไมค์หรือภาพหน้าจอ คีย์นี้ใช้ร่วมกับ OpenAI ในหน้าแชต';
+    this.keyLabel.textContent = `${NAME || ''} API key (เก็บแบบเข้ารหัสในเครื่อง)${p === 'custom' ? ' — ถ้าเซิร์ฟเวอร์ต้องใช้' : ''}`;
+    this.voiceIdLabel.textContent = p === 'elevenlabs' ? 'ElevenLabs Voice ID (ว่าง = George)' : p === 'fish' ? 'Fish Audio model ID ของเสียง (ว่าง = เสียงเริ่มต้น)' : 'ชื่อเสียงบนเซิร์ฟเวอร์ (เช่น af_heart, alloy)';
+    this.consentCaption.textContent = edge ? ' ยินยอมส่งข้อความที่อ่านไป Microsoft Edge TTS เพื่อสร้างเสียงไทยออนไลน์' : ` ยินยอมส่งข้อความที่อ่านไป ${NAME} และรับทราบว่าอาจมีค่าบริการ`;
+    this.cloudNote.textContent = edge ? 'มีเสียงไทยชายและหญิงให้เลือกทันที ไม่ต้องติดตั้งเสียงหรือใส่คีย์ ต้องใช้อินเทอร์เน็ต' : p === 'custom' ? 'ส่งข้อความไปที่ /v1/audio/speech ของเซิร์ฟเวอร์ที่ใส่ไว้ ถ้าเป็น localhost ไม่ต้องยินยอม เพราะไม่ออกจากเครื่อง' : 'เสียงสร้างโดย AI ใช้เฉพาะข้อความที่สั่งให้อ่าน ไม่ส่งเสียงไมค์หรือภาพหน้าจอ';
     this.voice.replaceChildren();
-    const voices = local ? this.info.voices : edge ? this.info.edgeVoices : this.info.cloudVoices.map((id) => ({ id, name: id, lang: 'ไทยและภาษาอื่น' }));
+    const voices = local ? this.info.voices : edge ? this.info.edgeVoices : kokoro ? this.info.kokoroVoices || [] : typed ? [] : this.info.cloudVoices.map((id) => ({ id, name: id, lang: 'ไทยและภาษาอื่น' }));
     for (const v of voices) { const option = node('option', `${v.name} · ${v.lang}`); option.value = v.id; this.voice.append(option); }
     if (voices.some((v) => v.id === this.settings.voice)) this.voice.value = this.settings.voice;
     else this.voice.value = voices.find((v) => /^th/i.test(v.lang))?.id || voices[0]?.id || '';
-    this.note.textContent = local ? (voices.some((v) => /^th/i.test(v.lang)) ? 'พบเสียงภาษาไทย อ่านได้โดยไม่ส่งข้อความออกจากเครื่อง' : 'ยังไม่พบเสียงภาษาไทย ติดตั้งเสียงไทยใน Windows หรือเลือกเสียงไทย Edge ที่ใช้ได้ทันทีผ่านอินเทอร์เน็ต') : edge ? 'เสียงไทยพร้อมใช้ผ่าน Microsoft Edge TTS · ต้องใช้อินเทอร์เน็ต · ไม่ต้องใส่ API key' : `ส่งข้อความไป OpenAI เพื่อสร้างเสียง AI${this.info.hasKey ? ' · มีคีย์บันทึกไว้แล้ว' : ' · ยังไม่มีคีย์'}`;
+    const keyNote = this.info.hasKeys?.[p] ? ' · มีคีย์บันทึกไว้แล้ว' : p === 'custom' ? '' : ' · ยังไม่มีคีย์';
+    this.note.textContent = local ? (voices.some((v) => /^th/i.test(v.lang)) ? 'พบเสียงภาษาไทย อ่านได้โดยไม่ส่งข้อความออกจากเครื่อง' : 'ยังไม่พบเสียงภาษาไทย ติดตั้งเสียงไทยในเครื่อง หรือเลือกเสียงไทย Edge ที่ใช้ได้ทันทีผ่านอินเทอร์เน็ต')
+      : edge ? 'เสียงไทยพร้อมใช้ผ่าน Microsoft Edge TTS · ต้องใช้อินเทอร์เน็ต · ไม่ต้องใส่ API key'
+        : kokoro ? 'ทำงานในเครื่อง ไม่ส่งข้อความออกไป ครั้งแรกดาวน์โหลดโมเดลประมาณ 90 MB · อ่านภาษาอังกฤษ ญี่ปุ่น จีน และอีกบางภาษา ยังไม่รองรับภาษาไทย'
+          : `ส่งข้อความไป ${NAME} เพื่อสร้างเสียง${keyNote}`;
   }
   async show() { this.root.hidden = false; this.status.textContent = ''; this.onVisibility(true); await this.load(); this.provider.focus(); }
   hide() { this.root.hidden = true; this.key.value = ''; this.onVisibility(false); }
   async save() {
-    const settings = { provider: this.provider.value, voice: this.voice.value, volume: Number(this.volume.value), rate: Number(this.rate.value), auto: this.auto.checked, cloudConsent: this.consent.checked };
-    if (settings.provider !== 'windows' && !settings.cloudConsent) throw new Error('กรุณายินยอมส่งข้อความไปบริการเสียงออนไลน์ก่อน');
-    this.settings = await this.host.speechSave(settings, settings.provider === 'openai' ? this.key.value.trim() : ''); this.key.value = ''; return this.settings;
+    const p = this.provider.value, typed = ['elevenlabs', 'fish', 'custom'].includes(p);
+    const settings = { provider: p, voice: typed ? this.voiceId.value.trim() : this.voice.value, volume: Number(this.volume.value), rate: Number(this.rate.value), auto: this.auto.checked, cloudConsent: this.consent.checked,
+      customUrl: this.customUrl.value.trim(), customModel: this.customModel.value.trim(), pitch: Number(this.pitch.value), robot: Number(this.robot.value), glitch: Number(this.glitch.value), layers: this.layers.checked };
+    const local = p === 'windows' || p === 'kokoro' || (p === 'custom' && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(settings.customUrl));
+    if (!local && !settings.cloudConsent) throw new Error('กรุณายินยอมส่งข้อความไปบริการเสียงออนไลน์ก่อน');
+    this.settings = await this.host.speechSave(settings, ['openai', 'elevenlabs', 'fish', 'custom'].includes(p) ? this.key.value.trim() : ''); this.key.value = ''; return this.settings;
   }
   error(error) { this.status.textContent = String(error.message || error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''); }
   async tryPlay(text) { try { await this.save(); await this.play(text); } catch (error) { this.error(error); } }
@@ -135,16 +166,33 @@ export class Speech {
       const bytes = Uint8Array.from(atob(result.audio), (c) => c.charCodeAt(0));
       const buffer = await this.context.decodeAudioData(bytes.buffer);
       if (serial !== this.serial) return;
-      this.source = this.context.createBufferSource(); this.gain = this.context.createGain();
-      this.source.buffer = buffer; this.gain.gain.value = this.settings.volume;
-      this.source.connect(this.gain).connect(this.context.destination);
-      this.source.onended = () => { if (serial === this.serial) { this.stopButton.hidden = true; this.status.textContent = 'อ่านจบแล้ว'; this.source = null; } };
+      const ctx = this.context, fx = this.settings, cents = (fx.pitch || 0) * 100;
+      this.gain = ctx.createGain(); this.gain.gain.value = fx.volume; this.gain.connect(ctx.destination);
+      // robot: her voice rung against a low hum, mixed in by how much
+      const into = ctx.createGain();
+      if (fx.robot > 0) {
+        const dry = ctx.createGain(), wet = ctx.createGain(), depth = ctx.createGain();
+        dry.gain.value = 1 - fx.robot * 0.7; wet.gain.value = 0; depth.gain.value = fx.robot;
+        this.osc = ctx.createOscillator(); this.osc.frequency.value = 55; this.osc.connect(depth).connect(wet.gain); this.osc.start();
+        into.connect(dry).connect(this.gain); into.connect(wet).connect(this.gain);
+      } else into.connect(this.gain);
+      // pitch moves the whole voice (and its speed a little); layers: one copy higher, one lower, quieter
+      this.sources = [[cents, 1], ...(fx.layers ? [[cents + 500, 0.3], [cents - 500, 0.3]] : [])].map(([detune, level]) => {
+        const source = ctx.createBufferSource(), g = ctx.createGain(); source.buffer = buffer; source.detune.value = detune; g.gain.value = level;
+        source.connect(g).connect(into); return source;
+      });
+      this.source = this.sources[0]; this.speed = 2 ** (cents / 1200);
+      // glitch: now and then her voice drops out for a few hundredths of a second
+      if (fx.glitch > 0) this.glitchTimer = setInterval(() => { if (Math.random() < fx.glitch * 0.35) { const t = ctx.currentTime; this.gain.gain.setValueAtTime(0, t); this.gain.gain.setValueAtTime(fx.volume, t + 0.03 + Math.random() * 0.06); } }, 120);
+      this.source.onended = () => { if (serial === this.serial) { this.stopButton.hidden = true; this.status.textContent = 'อ่านจบแล้ว'; this.release(); } };
       this.mouths = mouthLevels(buffer.getChannelData(0), buffer.sampleRate);
-      this.source.start(); this.startedAt = this.context.currentTime; this.status.textContent = 'กำลังอ่าน…';
+      for (const source of this.sources) source.start(); this.startedAt = ctx.currentTime; this.status.textContent = 'กำลังอ่าน…';
     } catch (error) { if (serial === this.serial) { this.stopButton.hidden = true; throw error; } }
   }
   // her voice's loudness right now, 0 to 1, for her mouth
-  level() { return this.source && this.mouths ? this.mouths[Math.floor((this.context.currentTime - this.startedAt) * MOUTH_RATE)] ?? 0 : 0; }
-  stop() { const active = this.source || !this.stopButton.hidden; this.serial++; this.lastError = false; this.host.speechStop(); if (this.source) { this.source.onended = null; this.source.stop(); this.source = null; } this.stopButton.hidden = true; if (active) this.status.textContent = 'หยุดเสียงแล้ว'; }
+  level() { return this.source && this.mouths ? this.mouths[Math.floor((this.context.currentTime - this.startedAt) * (this.speed || 1) * MOUTH_RATE)] ?? 0 : 0; }
+  // the voice's nodes and timers, let go
+  release() { clearInterval(this.glitchTimer); this.osc?.stop(); this.osc = null; for (const s of this.sources || []) { s.onended = null; try { s.stop(); } catch {} } this.sources = []; this.source = null; }
+  stop() { const active = this.source || !this.stopButton.hidden; this.serial++; this.lastError = false; this.host.speechStop(); if (this.source) this.release(); this.stopButton.hidden = true; if (active) this.status.textContent = 'หยุดเสียงแล้ว'; }
   reply(text) { if (this.settings.auto) this.play(text).catch((error) => { this.error(error); if (!this.open) { this.lastError = true; this.stopButton.textContent = 'เสียงพูดไม่พร้อม — เปิดตั้งค่า'; this.stopButton.hidden = false; } }); }
 }

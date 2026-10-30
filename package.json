@@ -52,6 +52,7 @@
     "@fontsource/chakra-petch": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "electron-updater": "^6.8.11",
+    "kokoro-js": "1.2.1",
     "node-edge-tts": "1.2.12"
   },
   "build": {
@@ -71,7 +72,9 @@
       "README.th.md",
       "README.upstream.md",
       "docs/*.md",
-      "!scripts/live-*.js"
+      "!scripts/live-*.js",
+      "!node_modules/onnxruntime-web/**",
+      "!node_modules/onnxruntime-node/bin/napi-v*/linux/**"
     ],
     "asarUnpack": [
       "hooks/**",
@@ -83,6 +86,7 @@
       "src/main/computer-audio.cs"
     ],
     "win": {
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v*/darwin/**"],
       "target": "nsis",
       "icon": "assets/icons/capri.ico"
     },
@@ -97,6 +101,7 @@
         }
       ],
       "icon": "assets/icons/capri-512.png",
+      "files": ["!node_modules/onnxruntime-node/bin/napi-v*/win32/**"],
       "category": "public.app-category.entertainment",
       "extraResources": [
         {

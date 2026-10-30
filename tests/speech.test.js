@@ -71,3 +71,18 @@ test('parseSayVoices reads macOS say -v ? into the Windows voice shape', () => {
     { id: 'Eddy (English (US))', name: 'Eddy (English (US))', lang: 'en-US' },
   ]);
 });
+
+test('ElevenLabs, Fish and your own server: their endpoints, keys and consent; a localhost server needs none', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => { calls.push({ url, init }); return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }; };
+  const speech = createSpeech({ fetcher });
+  await assert.rejects(speech.speak('hi', { provider: 'elevenlabs' }, 'k'), /ยินยอม/);
+  await speech.speak('hi', { provider: 'elevenlabs', cloudConsent: true, voice: 'abcdefghij1234' }, 'k');
+  assert.match(calls[0].url, /api\.elevenlabs\.io\/v1\/text-to-speech\/abcdefghij1234/); assert.equal(calls[0].init.headers['xi-api-key'], 'k');
+  await speech.speak('hi', { provider: 'fish', cloudConsent: true, voice: 'ref1' }, 'f');
+  assert.equal(calls[1].url, 'https://api.fish.audio/v1/tts'); assert.equal(JSON.parse(calls[1].init.body).reference_id, 'ref1');
+  await speech.speak('hi', { provider: 'custom', customUrl: 'http://localhost:8880/v1', customModel: 'kokoro', voice: 'af_heart' }, '');
+  assert.equal(calls[2].url, 'http://localhost:8880/v1/audio/speech'); assert.equal(JSON.parse(calls[2].init.body).model, 'kokoro');
+  await assert.rejects(speech.speak('hi', { provider: 'custom', customUrl: 'https://tts.example.com' }, ''), /ยินยอม/);
+  assert.throws(() => speechSettings({ provider: 'windows', pitch: 40 }), /ปรับเสียง/);
+});

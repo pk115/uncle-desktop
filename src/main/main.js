@@ -14,8 +14,8 @@ const config = require('./config');
 const { CHARACTERS, characterFor } = require('./characters');
 const { createUserCharacters } = require('./user-characters');
 let userCharacters;
-const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES } = require('./speech');
-const speech = createSpeech({ script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
+const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES, KOKORO_VOICES } = require('./speech');
+const speech = createSpeech({ kokoroDir: () => path.join(app.getPath('userData'), 'kokoro'), script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
 const { createListening, listeningSettings } = require('./listening');
 const { createNative, createComputer, SECURITY, SWITCHES, LEVELS } = require('./computer');
 const { TIERS, tierModel } = require('./tiers');
@@ -961,18 +961,22 @@ function registerIpc() {
   ipcMain.handle('listening:install', (_e, model) => listening.install(text => overlay?.webContents.send('listening:progress', text), model));
   ipcMain.handle('listening:transcribe', (_e, { bytes, wakeOnly } = {}) => listening.transcribe(bytes, config.load().listening, listeningSettings(config.load().listening).provider === 'gemini' ? setup.openKeys(config.load().apiKeys).gemini || process.env.GEMINI_API_KEY : setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY, Boolean(wakeOnly)));
   ipcMain.on('listening:stop', () => listening.stop());
-  ipcMain.handle('speech:info', async (_e, refresh) => ({ settings: speechSettings(config.load().speech), voices: await speech.voices(Boolean(refresh)).catch(() => []), cloudVoices: CLOUD_VOICES, edgeVoices: EDGE_VOICES, hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY) }));
+  ipcMain.handle('speech:info', async (_e, refresh) => ({ settings: speechSettings(config.load().speech), voices: await speech.voices(Boolean(refresh)).catch(() => []), cloudVoices: CLOUD_VOICES, edgeVoices: EDGE_VOICES, kokoroVoices: KOKORO_VOICES, hasKeys: Object.fromEntries(['openai', 'elevenlabs', 'fish', 'custom'].map((p) => [p, Boolean(speechKey(p))])), hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY) }));
   ipcMain.handle('speech:save', (_e, { settings, key } = {}) => {
     const patch = { speech: speechSettings(settings) };
     if (key) {
       if (typeof key !== 'string' || key.length > 512 || /[\r\n]/.test(key)) throw new Error('API key ไม่ถูกต้อง');
       if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows ยังเข้ารหัสคีย์ไม่ได้ กรุณาลองใหม่');
-      patch.apiKeys = { ...config.load().apiKeys, openai: `enc:${safeStorage.encryptString(key.trim()).toString('base64')}` };
+      const slot = { openai: 'openai', elevenlabs: 'elevenlabs', fish: 'fish', custom: 'speechCustom' }[patch.speech.provider];
+      if (!slot) throw new Error('บริการนี้ไม่ใช้ API key');
+      patch.apiKeys = { ...config.load().apiKeys, [slot]: `enc:${safeStorage.encryptString(key.trim()).toString('base64')}` };
     }
     updateConfig(patch);
     return patch.speech;
   });
-  ipcMain.handle('speech:speak', (_e, text) => speech.speak(text, config.load().speech, setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY));
+  // the key of the voice service in use (ElevenLabs shares the voice agent's)
+  const speechKey = (provider) => ({ openai: setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY, elevenlabs: setup.openKeys(config.load().apiKeys).elevenlabs || process.env.ELEVENLABS_API_KEY, fish: setup.openKeys(config.load().apiKeys).fish, custom: setup.openKeys(config.load().apiKeys).speechCustom })[provider] || '';
+  ipcMain.handle('speech:speak', (_e, text) => speech.speak(text, config.load().speech, speechKey(speechSettings(config.load().speech).provider)));
   ipcMain.on('speech:stop', () => speech.stop());
   ipcMain.on('speech:windowsSettings', () => shell.openExternal('ms-settings:speech'));
   ipcMain.handle('characters:preview', (_e, bytes) => userCharacters.preview(bytes));

@@ -8,12 +8,57 @@ const { Worker } = require('node:worker_threads');
 
 const CLOUD_VOICES = ['coral', 'alloy', 'nova', 'onyx'];
 const EDGE_VOICES = [{ id: 'th-TH-PremwadeeNeural', name: 'เปรมวดี — หญิง', lang: 'th-TH' }, { id: 'th-TH-NiwatNeural', name: 'นิวัฒน์ — ชาย', lang: 'th-TH' }];
-const DEFAULT_SPEECH = { provider: 'windows', voice: '', volume: 0.7, rate: 1, auto: false, cloudConsent: false };
+// Kokoro: a free voice model that runs on this computer (English, Japanese, Chinese, Spanish, French,
+// Hindi, Italian, Portuguese; no Thai). Downloaded once (~90 MB) on first use.
+const KOKORO_VOICES = [['af_heart', 'Heart — หญิง US'], ['af_bella', 'Bella — หญิง US'], ['af_nicole', 'Nicole — หญิง US'], ['am_michael', 'Michael — ชาย US'], ['am_fenrir', 'Fenrir — ชาย US'], ['bf_emma', 'Emma — หญิง UK'], ['bm_george', 'George — ชาย UK'], ['jf_alpha', 'Alpha — หญิง ญี่ปุ่น'], ['zf_xiaoxiao', 'Xiaoxiao — หญิง จีน']].map(([id, name]) => ({ id, name, lang: id[0] === 'j' ? 'ja' : id[0] === 'z' ? 'zh' : 'en' }));
+const PROVIDERS = ['windows', 'edge', 'openai', 'elevenlabs', 'fish', 'kokoro', 'custom'];
+// on this computer: nothing leaves it, no consent to ask for
+const local = (s) => s.provider === 'windows' || s.provider === 'kokoro' || (s.provider === 'custom' && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(s.customUrl));
+const DEFAULT_SPEECH = { provider: 'windows', voice: '', volume: 0.7, rate: 1, auto: false, cloudConsent: false, customUrl: '', customModel: '', pitch: 0, robot: 0, glitch: 0, layers: false };
 function speechSettings(value = {}) {
-  if (!value || typeof value !== 'object' || !['windows', 'openai', 'edge'].includes(value.provider ?? 'windows') || typeof (value.voice ?? '') !== 'string' || (value.voice || '').length > 300) throw new Error('การตั้งค่าเสียงไม่ถูกต้อง');
+  if (!value || typeof value !== 'object' || !PROVIDERS.includes(value.provider ?? 'windows') || typeof (value.voice ?? '') !== 'string' || (value.voice || '').length > 300) throw new Error('การตั้งค่าเสียงไม่ถูกต้อง');
   const settings = { ...DEFAULT_SPEECH, ...Object.fromEntries(Object.keys(DEFAULT_SPEECH).filter((key) => key in value).map((key) => [key, value[key]])) };
   if (!Number.isFinite(settings.volume) || settings.volume < 0 || settings.volume > 1 || !Number.isFinite(settings.rate) || settings.rate < 0.5 || settings.rate > 2 || typeof settings.auto !== 'boolean' || typeof settings.cloudConsent !== 'boolean') throw new Error('การตั้งค่าเสียงไม่ถูกต้อง');
+  if (typeof settings.customUrl !== 'string' || settings.customUrl.length > 500 || (settings.customUrl && !/^https?:\/\/[^\s]+$/i.test(settings.customUrl)) || typeof settings.customModel !== 'string' || settings.customModel.length > 100) throw new Error('ที่อยู่หรือชื่อโมเดลเสียงไม่ถูกต้อง');
+  if (!Number.isFinite(settings.pitch) || Math.abs(settings.pitch) > 12 || ![settings.robot, settings.glitch].every((v) => Number.isFinite(v) && v >= 0 && v <= 1) || typeof settings.layers !== 'boolean') throw new Error('ค่าปรับเสียงไม่ถูกต้อง');
   return settings;
+}
+// Kokoro in a worker of its own, kept warm between lines (the model takes a few seconds to load)
+let kokoroWorker = null;
+function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
+  if (!kokoroWorker) {
+    kokoroWorker = new Worker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      let tts = null;
+      parentPort.on('message', async ({ id, text, voice, speed }) => {
+        try {
+          if (!tts) {
+            const { env } = require(workerData.transformers); env.cacheDir = workerData.cacheDir;
+            const { KokoroTTS } = require(workerData.kokoro);
+            tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' });
+          }
+          const audio = await tts.generate(text, { voice, speed });
+          parentPort.postMessage({ id, audio: Buffer.from(audio.toWav()).toString('base64') });
+        } catch (error) { parentPort.postMessage({ id, error: String(error.message || error) }); }
+      });
+    `, { eval: true, workerData: { cacheDir, kokoro: require.resolve('kokoro-js'), transformers: require.resolve('@huggingface/transformers') } });
+    kokoroWorker.on('error', () => { kokoroWorker = null; });
+    kokoroWorker.unref();
+  }
+  const worker = kokoroWorker, id = Math.random().toString(36).slice(2);
+  return new Promise((resolve, reject) => {
+    const done = (msg) => { if (msg.id !== id) return; worker.off('message', done); signal.removeEventListener('abort', abort); msg.error ? reject(new Error(`Kokoro สร้างเสียงไม่สำเร็จ: ${msg.error.slice(0, 120)}`)) : resolve({ audio: msg.audio }); };
+    const abort = () => { worker.off('message', done); reject(new Error('หยุดเสียงแล้ว')); };
+    worker.on('message', done); signal.addEventListener('abort', abort, { once: true });
+    worker.postMessage({ id, text, voice, speed: rate });
+  });
+}
+// a voice service's answer, as audio bytes for the renderer
+async function audioFrom(response, name) {
+  if (!response.ok) throw new Error([401, 403].includes(response.status) ? `${name}: API key ไม่ถูกต้องหรือไม่มีสิทธิ์` : response.status === 429 ? `${name}: โควตาหรือเครดิตไม่พอ` : `${name} สร้างเสียงไม่สำเร็จ (${response.status})`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!bytes.length || bytes.length > 16 * 1024 * 1024) throw new Error(`${name} ไม่ได้ส่งเสียงกลับมา`);
+  return { audio: bytes.toString('base64') };
 }
 function edgeSynthesize(text, voice, rate, signal) {
   return new Promise((resolve, reject) => {
@@ -60,7 +105,7 @@ async function mac(action, payload, signal) {
     return { audio: (await fs.readFile(file)).toString('base64') };
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 }
-function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = fetch, edge = edgeSynthesize } = {}) {
+function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = fetch, edge = edgeSynthesize, kokoro = kokoroSynthesize, kokoroDir = () => path.join(os.tmpdir(), 'uncle-kokoro') } = {}) {
   let running = null;
   let cachedVoices = null;
   function stop() { running?.abort(); running = null; }
@@ -91,12 +136,13 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
     }
     return cachedVoices;
   }
+  // key: the chosen service's own (OpenAI, ElevenLabs, Fish, or your server's)
   async function speak(text, options, key) {
     if (typeof text !== 'string' || !text.trim() || text.length > 2000) throw new Error('ข้อความเสียงต้องมี 1–2000 ตัวอักษร');
     const settings = speechSettings(options);
     stop();
     const controller = new AbortController(); running = controller;
-    const timeout = setTimeout(() => controller.abort(), settings.provider === 'edge' ? 20000 : 90000);
+    const timeout = setTimeout(() => controller.abort(), settings.provider === 'edge' ? 20000 : settings.provider === 'kokoro' ? 180000 : 90000);
     try {
       if (settings.provider === 'windows') {
         const list = await voices();
@@ -105,6 +151,22 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
         if (!selected) throw new Error('ไม่พบเสียงที่เลือก กรุณาติดตั้งเสียงภาษาไทยในเครื่อง (Windows หรือ macOS) แล้วกดรีเฟรช');
         if (/[\u0e00-\u0e7f]/.test(text) && !/^th/i.test(selected.lang)) throw new Error('เสียงที่เลือกไม่รองรับภาษาไทย กรุณาติดตั้งเสียงไทยหรือเลือกเสียง AI ออนไลน์');
         return await windows('speak', { text, voice: selected.id, rate: settings.rate }, controller.signal);
+      }
+      if (!local(settings) && !settings.cloudConsent) throw new Error('กรุณายินยอมส่งข้อความไปบริการเสียงออนไลน์ในหน้าเสียงพูดก่อน');
+      if (settings.provider === 'kokoro') return await kokoro(text, KOKORO_VOICES.some((v) => v.id === settings.voice) ? settings.voice : 'af_heart', settings.rate, controller.signal, kokoroDir());
+      if (settings.provider === 'elevenlabs') {
+        if (!key) throw new Error('กรุณาใส่ ElevenLabs API key ในหน้าเสียงพูด');
+        const voice = /^[A-Za-z0-9]{10,40}$/.test(settings.voice) ? settings.voice : 'JBFqnCBsd6RMkjVDRZzb';
+        return await audioFrom(await fetcher(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`, { method: 'POST', signal: controller.signal, headers: { 'xi-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ text, model_id: 'eleven_v3', voice_settings: { speed: Math.min(1.2, Math.max(0.7, settings.rate)) } }) }), 'ElevenLabs');
+      }
+      if (settings.provider === 'fish') {
+        if (!key) throw new Error('กรุณาใส่ Fish Audio API key ในหน้าเสียงพูด');
+        return await audioFrom(await fetcher('https://api.fish.audio/v1/tts', { method: 'POST', signal: controller.signal, headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', model: 's1' }, body: JSON.stringify({ text, format: 'mp3', ...(settings.voice && { reference_id: settings.voice }), prosody: { speed: settings.rate } }) }), 'Fish Audio');
+      }
+      if (settings.provider === 'custom') { // any OpenAI-compatible speech server: Kokoro-FastAPI, your own model, a cloud one
+        if (!settings.customUrl) throw new Error('กรุณาใส่ที่อยู่เซิร์ฟเวอร์เสียงของคุณ');
+        const url = settings.customUrl.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1/audio/speech';
+        return await audioFrom(await fetcher(url, { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(key && { Authorization: `Bearer ${key}` }) }, body: JSON.stringify({ model: settings.customModel || 'tts-1', voice: settings.voice || 'alloy', input: text, response_format: 'mp3', speed: settings.rate }) }), 'เซิร์ฟเวอร์เสียง');
       }
       if (settings.provider === 'edge') {
         if (!settings.cloudConsent) throw new Error('กรุณายินยอมส่งข้อความไป Microsoft Edge TTS ในหน้าเสียงพูดก่อน');
@@ -127,4 +189,4 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
   }
   return { voices, speak, stop };
 }
-module.exports = { createSpeech, parseSayVoices, speechSettings, DEFAULT_SPEECH, CLOUD_VOICES, EDGE_VOICES };
+module.exports = { createSpeech, parseSayVoices, KOKORO_VOICES, PROVIDERS, speechSettings, DEFAULT_SPEECH, CLOUD_VOICES, EDGE_VOICES };
