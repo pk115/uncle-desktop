@@ -96,6 +96,7 @@ npm start
 - `npm run hooks:codex:install` — ติดตั้ง Hook สำหรับ Codex
 - `npm run hooks:install` — ติดตั้ง Hook สำหรับ Claude Code
 - `npm run dist` — Build โปรแกรมสำหรับติดตั้งบน Windows (NSIS Installer)
+- `npm run release` — Build แล้วอัปโหลดตัวติดตั้งขึ้น GitHub Release แบบ draft (ต้องตั้ง `GH_TOKEN`) กด Publish แล้วเครื่องที่ติดตั้งไว้จะอัปเดตเอง
 
 ---
 

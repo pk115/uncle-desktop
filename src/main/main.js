@@ -1153,6 +1153,13 @@ function main() {
     const voiceKey = globalShortcut.register('Control+Alt+V', () => sendCommand('listening-toggle'));
     const muteKey = globalShortcut.register('Control+Alt+M', () => { listening?.stop(); sendCommand('listening-stop'); });
     if (!voiceKey || !muteKey) console.warn('[uncle] Voice shortcut unavailable; use the voice window or tray menu');
+    // Installed copies update from GitHub Releases: downloaded quietly, installed when she quits.
+    if (app.isPackaged) {
+      const { autoUpdater } = require('electron-updater');
+      const checkUpdate = () => autoUpdater.checkForUpdatesAndNotify().catch((err) => console.warn('[uncle] update check failed:', err.message));
+      checkUpdate();
+      setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
+    }
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
