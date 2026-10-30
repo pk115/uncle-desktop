@@ -17,7 +17,7 @@ let userCharacters;
 const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES } = require('./speech');
 const speech = createSpeech({ script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
 const { createListening, listeningSettings } = require('./listening');
-const { createNative, createComputer, SECURITY } = require('./computer');
+const { createNative, createComputer, SECURITY, SWITCHES, LEVELS } = require('./computer');
 const { TIERS, tierModel } = require('./tiers');
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
@@ -910,15 +910,16 @@ function registerIpc() {
       return llm.chat(cfg.provider,cfg,{model:computerModel,messages:[{role:'system',content:prompt},observation]},()=>{},AbortSignal.any([signal,timeout]));
     },
   });
-  const computerOptions=()=>{const saved=config.load().computerControl||{};return {consent:saved.consent===true&&saved.provider===config.load().provider,voice:saved.voice===true,images:saved.images===true,security:SECURITY.includes(saved.security)?saved.security:'guarded'};};
+  const computerOptions=()=>{const saved=config.load().computerControl||{};return {consent:saved.consent===true&&saved.provider===config.load().provider,voice:saved.voice===true,images:saved.images===true,security:SECURITY.includes(saved.security)?saved.security:'guarded',switches:validSwitches(saved.switches)||LEVELS[SECURITY.includes(saved.security)?saved.security:'guarded']};};
+  const validSwitches=v=>v&&typeof v==='object'&&SWITCHES.every(k=>typeof v[k]==='boolean')?Object.fromEntries(SWITCHES.map(k=>[k,v[k]])):null;
   ipcMain.handle('computer:info',()=>({settings:computerOptions(),provider:config.load().provider}));
-  ipcMain.handle('computer:save',(_e,value)=>{if(!value||['consent','voice','images'].some(k=>typeof value[k]!=='boolean')||(value.security!==undefined&&!SECURITY.includes(value.security)))throw new Error('ตัวเลือกควบคุมไม่ถูกต้อง');const prior=computerOptions();if(!value.consent||(prior.images&&!value.images)||(prior.voice&&!value.voice))computer.stop();updateConfig({computerControl:{consent:value.consent,voice:value.voice,images:value.images,security:value.security||computerOptions().security,provider:config.load().provider}});return computerOptions();});
+  ipcMain.handle('computer:save',(_e,value)=>{if(!value||['consent','voice','images'].some(k=>typeof value[k]!=='boolean')||(value.security!==undefined&&!SECURITY.includes(value.security))||(value.switches!==undefined&&!validSwitches(value.switches)))throw new Error('ตัวเลือกควบคุมไม่ถูกต้อง');const prior=computerOptions();if(!value.consent||(prior.images&&!value.images)||(prior.voice&&!value.voice))computer.stop();updateConfig({computerControl:{consent:value.consent,voice:value.voice,images:value.images,security:value.security||computerOptions().security,switches:value.switches?validSwitches(value.switches):LEVELS[value.security||computerOptions().security],provider:config.load().provider}});return computerOptions();});
   ipcMain.handle('computer:start' , (_e, request) => {
     if(computer.busy)throw new Error('มีงานกำลังทำอยู่');
     if(request?.voice&&(!computerOptions().consent||!computerOptions().voice))throw new Error('กรุณาอนุญาตเริ่มงานด้วยเสียงก่อน');
     computerConfig=llmConfig();computerModel=pickModel(computerConfig);
     if(!computerModel)throw new Error('กรุณาตั้งค่า AI และเลือกโมเดลก่อนเริ่ม');
-    const {task,consent,images,voice}=request||{};return computer.start({task,consent,images,voice,security:computerOptions().security});
+    const {task,consent,images,voice}=request||{};return computer.start({task,consent,images,voice,security:computerOptions().security,switches:computerOptions().switches});
   });
   ipcMain.handle('computer:answer', (_e, value) => {if(!value||typeof value.jobId!=='string'||typeof value.approvalId!=='string')throw new Error('คำยืนยันต้องตรงกับขั้นตอนปัจจุบัน');return computer.answer(value);});
   ipcMain.on('computer:stop', () => computer.stop());
@@ -943,7 +944,7 @@ function registerIpc() {
     if(!computerOptions().consent||!computerOptions().voice)throw Error('ยังไม่ได้ทำ: เปิดควบคุมเครื่อง อนุญาตอ่านหน้าต่างและเริ่มงานด้วยเสียง แล้วบันทึกสิทธิ์ก่อน');
     const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=pickModel(computerConfig);
     if(!plan.action&&!computerModel)throw Error('ตั้งค่า AI สำหรับวางแผนควบคุมเครื่องก่อน');
-    const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly,security:computerOptions().security});
+    const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly,security:computerOptions().security,switches:computerOptions().switches});
     return JSON.stringify({status:'accepted',jobId:id,message:'เริ่มรับงานแล้ว ยังไม่ใช่ผลสำเร็จ รอคำถามหรือผลตรวจจากระบบงาน'});
   });
   listening = createListening({ directory: path.join(app.getPath('userData'), 'voice-models') });

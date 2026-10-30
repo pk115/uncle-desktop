@@ -186,3 +186,5 @@
   filter: drop-shadow(0 0 6px #39ff88) drop-shadow(0 0 2px #ff2bd6); transition: left .35s cubic-bezier(.2,.8,.2,1), top .35s cubic-bezier(.2,.8,.2,1), opacity .2s; }
 #her-cursor.is-on { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { #her-cursor { transition: opacity .2s; } }
+
+.security-switches { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 12px; margin: 4px 0 10px; }

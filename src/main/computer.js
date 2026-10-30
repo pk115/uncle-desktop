@@ -68,29 +68,37 @@ function actionFrom(text) {
   return a;
 }
 const EFFECT=/ส่ง|โพสต์|เผยแพร่|ลบ|ติดตั้ง|ซื้อ|จ่าย|ชำระ|โอน|บันทึก|ยืนยัน|ตกลง|ถังขยะ|ถอนการติดตั้ง|\b(send|post|publish|delete|remove|install|buy|pay|purchase|checkout|submit|save|confirm|accept|ok|yes|trash|recycle)\b/i;
-// How much she asks first: lockdown only reads; guarded asks before anything with an effect;
-// trusted only before money, deleting, installing, closing apps and power; blackwall never asks.
-// Every level still refuses password fields and typing into consoles.
+// Her SECURITY: four levels, each a preset of nine switches (on = she does it without asking);
+// the images switch (screenshots to the AI) is the tenth. Lockdown only reads. Every level still
+// refuses password fields and typing into consoles.
 const SECURITY=['lockdown','guarded','trusted','blackwall'];
-const RISKY=/ลบ|ติดตั้ง|ซื้อ|จ่าย|ชำระ|โอน|จอง|ถังขยะ|ถอนการติดตั้ง|\b(delete|remove|install|uninstall|buy|pay|purchase|checkout|order|book|trash)\b/i;
-function needsConfirmation(a,view,security='guarded') {
-  if(security==='blackwall')return false;
-  if(security==='trusted'){
-    if(a.tool==='power')return a.action!=='cancel_shutdown';
-    if(a.tool==='app_window')return a.action==='close';
-    if(['click','double_click','triple_click','middle_click','right_click'].includes(a.tool))return RISKY.test(view.targets?.find(t=>t.id===a.target)?.name||'');
+const SWITCHES=['apps','clicks','keys','windows','media','power','games','send','money'];
+const preset=on=>Object.fromEntries(SWITCHES.map(k=>[k,on.includes(k)]));
+const LEVELS={lockdown:preset([]),guarded:preset(['apps','media']),trusted:preset(['apps','clicks','keys','windows','media','games','send']),blackwall:preset(SWITCHES)};
+const RISKY=/ลบ|ติดตั้ง|ซื้อ|จ่าย|ชำระ|โอน|จอง|ถังขยะ|ถอนการติดตั้ง|\b(delete|remove|install|uninstall|buy|pay|purchase|checkout|order|book|trash|recycle)\b/i;
+const CLICKS=['click','double_click','triple_click','middle_click','right_click'];
+const NAV=['TAB','SHIFT+TAB','ESC','UP','DOWN','LEFT','RIGHT','HOME','END','PAGEUP','PAGEDOWN','CTRL+A','CTRL+C','CTRL+F','CTRL+L','CTRL+Z','CTRL+Y'];
+function needsConfirmation(a,view,switches='guarded') {
+  const on=typeof switches==='string'?LEVELS[switches]:switches;
+  if(a.tool==='power')return a.action!=='cancel_shutdown'&&!on.power;
+  if(a.tool==='app_window')return a.action==='close'&&!on.windows;
+  if(['drag','hold_key','hold_and_press'].includes(a.tool))return !on.games;
+  if(a.tool==='open_app')return /powershell|terminal|cmd|regedit|script|uninstall/i.test(a.name||'')||!on.apps;
+  if(a.tool==='open_website'||a.tool==='play_music')return !on.apps;
+  if(a.tool==='media')return !on.media;
+  if(a.tool==='key'){
+    if(NAV.includes(a.text))return false;
+    if(a.text==='ENTER'&&view.targets?.some(t=>t.focused&&!t.secret&&(/search|ค้นหา|ค้นเว็บ/i.test(t.name)||t.role==='Document'&&/notepad/i.test(view.app.process))))return false;
+    return a.text==='ENTER'?!on.send:!on.keys;
+  }
+  if(a.tool==='type')return view.targets?.find(t=>t.id===a.target)?.secret||Boolean(a.enter||/\r|\n/.test(a.text))&&!on.send;
+  if(CLICKS.includes(a.tool)){
+    const target=view.targets?.find(t=>t.id===a.target);
+    if(!target)return !on.clicks; // by position: she can't read what it is
+    if(RISKY.test(target.name||''))return !on.money;
+    if(EFFECT.test(target.name||''))return !on.send;
     return false;
   }
-  if(a.tool==='power')return a.action!=='cancel_shutdown';
-  if(a.tool==='app_window')return a.action==='close';
-  if(['drag','hold_key','hold_and_press'].includes(a.tool))return true;
-  if(a.tool==='open_app')return /powershell|terminal|cmd|regedit|script|uninstall/i.test(a.name||'');
-  if(a.tool==='key'){
-    if(a.text==='ENTER'&&view.targets?.some(t=>t.focused&&!t.secret&&(/search|ค้นหา|ค้นเว็บ/i.test(t.name)||t.role==='Document'&&/notepad/i.test(view.app.process))))return false;
-    return !['TAB','SHIFT+TAB','ESC','UP','DOWN','LEFT','RIGHT','HOME','END','PAGEUP','PAGEDOWN','CTRL+A','CTRL+C','CTRL+F','CTRL+L','CTRL+Z','CTRL+Y'].includes(a.text);
-  }
-  if(a.tool==='type')return Boolean(a.enter||/\r|\n/.test(a.text)||view.targets?.find(t=>t.id===a.target)?.secret);
-  if(['click','double_click','triple_click','middle_click','right_click'].includes(a.tool)){const target=view.targets?.find(t=>t.id===a.target);return !target||EFFECT.test(target.name||'');}
   return false;
 }
 const visibleText=view=>view.targets.filter(t=>!t.secret).map(t=>`${t.name} ${t.value}`).join(' ').normalize('NFKC').replace(/\s/g,'');
@@ -152,7 +160,7 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
           if(a.tool==='drag'&&(a.toTarget?!toTarget:!image||!Number.isInteger(a.endX)||!Number.isInteger(a.endY)||a.endX>=image.width||a.endY>=image.height))throw new Error('ปลายทางลากไม่ถูกต้อง');
         }
         if(a.tool==='type'&&/powershell|cmd|terminal|regedit|\brun\b|เรียกใช้|\bconsole\b/i.test(`${view.app.process} ${view.app.title} ${target?.name||''}`))throw new Error('ไม่พิมพ์คำสั่งในคอนโซลหรือ Run');
-        if(needsConfirmation(a,view,current.security)){await approve(current,`${a.reason} ใน ${view.app.title} — ยืนยันให้ทำขั้นตอนนี้หรือไม่?`);await native.request({action:'focus',window:view.app.window},signal);}
+        if(needsConfirmation(a,view,current.switches)){await approve(current,`${a.reason} ใน ${view.app.title} — ยืนยันให้ทำขั้นตอนนี้หรือไม่?`);await native.request({action:'focus',window:view.app.window},signal);}
         if(signal.aborted||job!==current)return;
         const before=await native.request({action:'read',window:0},signal);
         if(before.app.window!==view.app.window)throw new Error('หน้าต่างเปลี่ยนระหว่างรอ กรุณาเริ่มงานใหม่');
@@ -182,12 +190,12 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
     }catch(e){if(job===current&&!signal.aborted)emit(current,{status:'error',message:e.message});}
     finally{clearTimeout(current.deadline);clearTimeout(current.timer);if(job===current){native.stop();job=null;}}
   }
-  function start({task,consent,images=false,voice=false,directAction=null,readOnly=false,security='guarded'}){
+  function start({task,consent,images=false,voice=false,directAction=null,readOnly=false,security='guarded',switches=null}){
     if(job)throw new Error('มีงานกำลังทำอยู่');if(typeof task!=='string'||!task.trim()||task.length>2000||consent!==true||typeof images!=='boolean'||typeof voice!=='boolean'||!SECURITY.includes(security))throw new Error('ระบุงานและอนุญาตอ่านหน้าจอก่อนเริ่ม');
-    const current={task:task.trim(),inbox:[],images,readOnly:readOnly||security==='lockdown',security,directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
+    const current={task:task.trim(),inbox:[],images,readOnly:readOnly||security==='lockdown',security,switches:switches||LEVELS[security],directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
   }
   // something you say while she works: she says got it and takes it into her next step
   function tell(text){if(typeof text!=='string'||!text.trim()||text.length>1000)throw new Error('ข้อความไม่ถูกต้อง');if(!job)return false;job.inbox.push(text.trim());emit(job,{message:'รับทราบ: '+text.trim()});return true;}
   return{start,stop,answer,tell,get busy(){return Boolean(job);}};
 }
-module.exports={createNative,createComputer,actionFrom,needsConfirmation,SHORTCUTS,SECURITY};
+module.exports={createNative,createComputer,actionFrom,needsConfirmation,SHORTCUTS,SECURITY,SWITCHES,LEVELS};
