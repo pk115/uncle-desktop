@@ -14,6 +14,7 @@ import { Speech } from './speech.js';
 import { Listening } from './listening.js';
 import { VoiceAgent } from './voice-agent.js';
 import { Computer } from './computer.js';
+import * as media from './media.js';
 import { Settings } from './settings.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
@@ -634,6 +635,11 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
+  // jobs from her main process that need Chromium: audio and video from your phone, decoded here
+  host.onRpc(async ({ id, name, args }) => {
+    try { host.rpcReply({ id, ok: true, value: await media[name](args) }); }
+    catch (err) { host.rpcReply({ id, ok: false, error: err.message }); }
+  });
   window.dev = { settings: settingsUI, computer:computerUI, voiceAgent:listeningUI.realtime, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
@@ -772,6 +778,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'telegram-token') { // her Telegram bot's token, pasted in her panel
+      const got = await guide.askText({ face: 'look', line: 'วาง bot token จาก @BotFather', quote: 'หน้าตาแบบ 123456789:AA… · ฉันเก็บแบบเข้ารหัสในเครื่อง', secret: true, placeholder: '123456789:AA…' });
+      if (!got?.text) return;
+      try { const bot = await host.telegramToken(got.text); panel.say({ kind: 'info', line: `เชื่อม @${bot} แล้ว ต่อไปกด "ผูกกับแชตของคุณ…" ในแท็บ Telegram`, hold: 8000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 9000 }); }
+      return;
+    }
     if (cmd.name === 'assistant-alert') { // her assistant: important mail, a meeting soon, or how setup went
       const link = cmd.link && /^https:\/\//.test(cmd.link) ? cmd.link : '';
       if (cmd.kind === 'mail' || cmd.kind === 'event') {

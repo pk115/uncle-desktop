@@ -24,6 +24,24 @@ const { chatWithTools } = require('./tool-chat');
 const { createAssistant, MAIL_QUERY } = require('./assistant');
 let personal = null; // Gmail and Calendar through MCP, and their alerts
 const { createJobs } = require('./jobs');
+const { createTelegram } = require('./telegram');
+const { createPhone } = require('./phone');
+let telegram = null, phone = null; // your phone, through her Telegram bot
+// her Telegram settings, with what's off by default
+const PHONE_SWITCHES = { chat: true, approve: true, screen: false, control: false, power: false };
+const phoneSettings = () => { const t = config.load().telegram || {}; return { chatId: t.chatId || null, notify: t.notify || 'always', voiceReply: t.voiceReply || 'voice', switches: { ...PHONE_SWITCHES, ...t.switches }, pin: t.pin || '' }; };
+const savePhone = (patch) => updateConfig({ telegram: { ...config.load().telegram, ...patch } });
+// a job for her page (renderer), answered later: decoding audio and video with Chromium
+const rendererCalls = new Map();
+function inRenderer(name, args, ms = 120000) {
+  return new Promise((resolve, reject) => {
+    if (!overlay) return reject(new Error('หน้าต่างยังไม่พร้อม'));
+    const id = randomUUID();
+    rendererCalls.set(id, { resolve, reject });
+    overlay.webContents.send('rpc', { id, name, args });
+    setTimeout(() => { if (rendererCalls.delete(id)) reject(new Error('ใช้เวลานานเกินไป')); }, ms).unref?.();
+  });
+}
 const jobs = createJobs({ log: (line) => console.log(line) }); // her background jobs (news, briefs…)
 const notifiers = []; // where her alerts go besides her bubble (Telegram)
 // an alert for you: her bubble, and every other way you've set up
@@ -711,6 +729,29 @@ function rebuildTray() {
       { label: th ? 'แก้ไข mcp.json…' : 'Edit mcp.json…', click: () => { if (!fs.existsSync(mcp.file)) mcp.save({}); shell.openPath(mcp.file); } },
       { label: th ? 'โหลด MCP ใหม่' : 'Reload MCP servers', click: () => mcp.start().then(rebuildTray) },
     ] },
+    // your phone: her Telegram bot
+    { id: 'phone', title: 'Telegram', items: (() => {
+      const s = phoneSettings(), bot = cfg.telegram?.bot, hasToken = Boolean(setup.openKeys(cfg.apiKeys).telegram);
+      const state = !hasToken ? (th ? 'ยังไม่ได้ใส่ bot token' : 'no bot token yet') : !s.chatId ? (th ? `@${bot} · ยังไม่ได้ผูกแชต` : `@${bot} · not paired yet`) : (th ? `@${bot} · เชื่อมแล้ว` : `@${bot} · connected`);
+      const radio = (key, value, label) => ({ label, type: 'radio', checked: s[key] === value, click: () => savePhone({ [key]: value }) });
+      const sw = (key, label) => ({ label, type: 'checkbox', checked: s.switches[key], click: (it) => savePhone({ switches: { ...s.switches, [key]: it.checked } }) });
+      return [
+        { label: `Telegram: ${state}`, enabled: false },
+        { label: hasToken ? (th ? 'เปลี่ยน bot token…' : 'Change bot token…') : (th ? 'ใส่ bot token…' : 'Add a bot token…'), click: () => sendCommand('telegram-token') },
+        ...(hasToken ? [{ label: s.chatId ? (th ? 'ผูกกับแชตใหม่…' : 'Pair again…') : (th ? 'ผูกกับแชตของคุณ…' : 'Pair with your chat…'), click: () => { const code = telegram.startPairing(); shell.openExternal(`https://t.me/${bot}?start=${code}`); notifyUser({ kind: 'info', message: `เปิด Telegram แล้ว กด Start (หรือส่ง /start ${code}) ภายใน 10 นาที` }); } }] : []),
+        ...(s.chatId ? [{ label: th ? 'ส่งข้อความทดสอบ' : 'Send a test message', click: () => telegram.send(s.chatId, 'ทดสอบจาก Uncle Desktop 👋').catch((err) => notifyUser({ kind: 'error', message: err.message })) }, { label: th ? 'เลิกผูกแชต' : 'Unpair', click: () => savePhone({ chatId: null }) }] : []),
+        { label: th ? 'วิธีสร้าง bot…' : 'How to make a bot…', click: () => shell.openExternal('https://github.com/pk115/uncle-desktop/blob/main/docs/TELEGRAM_TH.md') },
+        { type: 'separator' },
+        { label: th ? 'ส่งแจ้งเตือนเข้ามือถือ' : 'Alerts to your phone', enabled: false },
+        radio('notify', 'always', th ? 'ทุกครั้ง' : 'Always'), radio('notify', 'away', th ? 'เฉพาะตอนไม่อยู่หน้าคอม (5 นาที)' : 'Only while away (5 min)'), radio('notify', 'off', th ? 'ไม่ส่ง' : 'Never'),
+        { type: 'separator' },
+        { label: th ? 'ตอบกลับเป็นเสียง' : 'Reply in her voice', enabled: false },
+        radio('voiceReply', 'voice', th ? 'เมื่อคุณส่งเสียงมา' : 'When you send a voice message'), radio('voiceReply', 'always', th ? 'ทุกครั้ง' : 'Always'), radio('voiceReply', 'never', th ? 'ไม่ตอบเป็นเสียง' : 'Never'),
+        { type: 'separator' },
+        sw('chat', th ? 'คุยและถามข้อมูลจากมือถือ' : 'Chat from your phone'),
+        sw('approve', th ? 'อนุมัติงานจากมือถือ (ส่งเมล สร้างนัด…)' : 'Approve from your phone (send mail, events…)'),
+      ];
+    })() },
     { id: 'agents', title: 'Coding AI', items: [
       item.watch,
       ...(cfg.claude ? [
@@ -788,6 +829,67 @@ function runHooks(action, { quiet = false } = {}) {
 
 // The model she talks with: the one picked in her menu if it's still installed, else the first one
 // on this PC (a cloud model only once you pick it).
+// her answer to your phone: her persona, your notes, her tools; a picture goes to the vision model
+async function phoneAnswer({ history, text, images, confirm }) {
+  const cfg = config.load();
+  if (cfg.provider === 'claude') return 'คุยผ่าน Telegram ใช้ Claude Code ไม่ได้ เลือก AI อื่นในแท็บ AI แชตบนคอม';
+  if (!chatModels?.length) await refreshModels();
+  const who = characterFor(cfg.characterId);
+  const notes = [readNotes('personality') && `Your personality:\n${readNotes('personality')}`, readNotes('me') && `What you know about the user:\n${readNotes('me')}`].filter(Boolean).join('\n\n');
+  const system = `You are ${who.name}, the user's desktop companion and personal assistant, talking with them on Telegram from their phone while their computer runs you. Reply in the user's language, short and plain (a phone screen, no tables, no markdown headers).${notes ? `\n\n${notes}` : ''}`;
+  const user = !images.length ? { role: 'user', content: text } : cfg.provider === 'ollama'
+    ? { role: 'user', content: text, images }
+    : { role: 'user', content: [{ type: 'text', text }, ...images.map((b64) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }))] };
+  const messages = [{ role: 'system', content: system }, ...history, user];
+  const signal = AbortSignal.timeout(180000);
+  const model = images.length ? modelFor('vision', cfg) : null;
+  const chat = (msgs, s) => chatWithFallback({ ...cfg, chatModel: model || modelFor('tools', cfg) }, msgs, s, signal, () => false);
+  const tools = mcp?.tools() || [];
+  return tools.length
+    ? chatWithTools({ tools, messages, send: () => {}, chat, mayWrite: false, confirm, call: (server, name, args) => mcp.call(server, name, args, { signal }) })
+    : chat(messages, () => {});
+}
+// her Telegram bot, when it has a token
+function startPhone() {
+  telegram?.stop();
+  telegram = createTelegram({
+    getToken: () => setup.openKeys(config.load().apiKeys).telegram || '',
+    getChat: () => phoneSettings().chatId,
+    setChat: (chatId) => { savePhone({ chatId }); notifyUser({ kind: 'info', message: 'ผูก Telegram กับแชตของคุณแล้ว' }); rebuildTray(); },
+    onMessage: (m) => phone.onMessage(m),
+    log: (line) => console.log(line),
+  });
+  phone = createPhone({
+    telegram, settings: phoneSettings, answer: phoneAnswer, idleSeconds: () => powerMonitor.getSystemIdleTime(),
+    transcribe: async (wav) => {
+      const s = config.load().listening, keys = setup.openKeys(config.load().apiKeys);
+      return (await listening.transcribe(wav, s, listeningSettings(s).provider === 'gemini' ? keys.gemini || process.env.GEMINI_API_KEY : keys.openai || process.env.OPENAI_API_KEY)).text;
+    },
+    speak: async (text) => {
+      const cfg = config.load(), keys = setup.openKeys(cfg.apiKeys), provider = speechSettings(cfg.speech).provider;
+      const key = { openai: keys.openai, elevenlabs: keys.elevenlabs, fish: keys.fish, custom: keys.speechCustom }[provider] || '';
+      const { audio } = await speech.speak(text.slice(0, 1500), cfg.speech, key);
+      const bytes = Buffer.from(audio, 'base64');
+      const wav = bytes.toString('ascii', 0, 4) === 'RIFF';
+      return { bytes, ext: wav ? 'wav' : 'mp3', mime: wav ? 'audio/wav' : 'audio/mpeg' };
+    },
+    media: (name, args) => inRenderer(name, args),
+    log: (line) => console.log(line),
+  });
+  if (!notifiers.includes(phoneNotify)) notifiers.push(phoneNotify);
+  telegram.start();
+}
+const phoneNotify = (alert) => phone?.notify(alert);
+async function setTelegramToken(token) {
+  token = String(token || '').trim();
+  if (!/^\d{5,}:[\w-]{30,}$/.test(token)) throw new Error('bot token ไม่ถูกต้อง (หน้าตาแบบ 123456789:AA…)');
+  const probe = createTelegram({ getToken: () => token, getChat: () => null, setChat: () => {}, onMessage: () => {} });
+  const me = await probe.me();
+  updateConfig({ apiKeys: { ...config.load().apiKeys, telegram: setup.sealKey(token) }, telegram: { ...config.load().telegram, bot: me.username, chatId: null } });
+  startPhone();
+  return me.username;
+}
+
 // Gmail or Calendar: the key file first if there's none yet, then sign in (her browser), then reconnect
 async function pickGoogleKeys() {
   const pick = await dialog.showOpenDialog({ title: 'Google OAuth key (Desktop app)', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
@@ -1216,6 +1318,8 @@ function registerIpc() {
     }
   });
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
+  ipcMain.on('rpc:reply', (_e, { id, ok, value, error } = {}) => { const call = rendererCalls.get(id); if (!call) return; rendererCalls.delete(id); ok ? call.resolve(value) : call.reject(new Error(error || 'ทำไม่สำเร็จ')); });
+  ipcMain.handle('telegram:token', (_e, token) => setTelegramToken(token));
   ipcMain.on('mcp:answer', (_e, { id, yes } = {}) => { const resolve = mcpAsks.get(id); if (resolve) { mcpAsks.delete(id); resolve(yes === true); } });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
   ipcMain.handle('look:snap', async () => {
@@ -1567,6 +1671,7 @@ function main() {
     personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: notifyUser, log: (line) => console.log(line) });
     personal.start();
     jobs.start();
+    startPhone();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
