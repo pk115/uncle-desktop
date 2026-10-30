@@ -390,6 +390,8 @@ function rendererConfig() {
 }
 
 function updateConfig(patch) {
+  if ('scale' in patch && (!Number.isFinite(patch.scale) || patch.scale < 0.45 || patch.scale > 1.6)) throw new Error('Invalid character scale');
+  if ('characterFraming' in patch && !['full', 'bust'].includes(patch.characterFraming)) throw new Error('Invalid character framing');
   if ('listening' in patch) patch.listening = listeningSettings(patch.listening);
   if ('characterId' in patch || patch.visible === false || 'listening' in patch) listening?.stop();
   if (patch.muted === true || 'speech' in patch || 'characterId' in patch) speech.stop();
@@ -476,8 +478,16 @@ function rebuildTray() {
     { type: 'separator' },
     {
       label: t.size,
-      submenu: [[t.small, 0.45], [t.medium, 0.6], [t.large, 0.8]].map(([label, scale]) => ({
+      submenu: [[t.small, 0.45], [t.medium, 0.6], [t.large, 0.8], ['XL · 120%', 1.2], ['XXL · 160%', 1.6]].map(([label, scale]) => ({
         label, type: 'radio', checked: Math.abs(cfg.scale - scale) < 0.01, click: () => updateConfig({ scale }),
+      })),
+    },
+    {
+      label: resolveLang(cfg.lang) === 'th' ? 'มุมมองตัวละคร' : 'Character view',
+      submenu: [['full', 'เต็มตัว', 'Full body'], ['bust', 'ครึ่งตัว · เห็นหน้าชัด', 'Upper body']].map(([view, th, en]) => ({
+        label: resolveLang(cfg.lang) === 'th' ? th : en, type: 'radio', checked: (cfg.characterFraming || 'full') === view,
+        enabled: view === 'full' || characterFor(cfg.characterId).renderer !== 'capri',
+        click: () => updateConfig({ characterFraming: view }),
       })),
     },
     {

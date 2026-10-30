@@ -97,6 +97,7 @@ async function boot() {
   capri.restOn = config.rest || 'corner';
   capri.setView(innerWidth, innerHeight, innerHeight - floorGap);
   capri.setScale(config.scale);
+  capri.setFraming(config.characterFraming);
 
   const mission = new Mission();
   const brain = new Brain({ capri, panel, voice, host, mission, lang: config.lang, assistant: config.assistant });
@@ -281,9 +282,11 @@ async function boot() {
   picker = new CharacterPicker({
     host,
     root: document.getElementById('character-picker'),
-    characters: config.characters, currentId: config.characterId, lang: config.lang,
-    onChoose: async (characterId) => {
-      const cfg = await host.setConfig({ characterId });
+    characters: config.characters, currentId: config.characterId, lang: config.lang, scale: config.scale, framing: config.characterFraming,
+    onChoose: async (characterId, display = {}) => {
+      const patch = { ...display };
+      if (characterId !== capri.character.id) patch.characterId = characterId;
+      const cfg = await host.setConfig(patch);
       await switchCharacter(cfg.character);
       if (capri.character.id !== characterId) throw new Error('Character unavailable');
     },
@@ -684,6 +687,7 @@ async function boot() {
     speechUI.configure(cfg);
     listeningUI.configure(cfg);
     picker?.setCharacters(cfg.characters);
+    picker?.setDisplay(cfg.scale, cfg.characterFraming);
     voice.configure(cfg);
     jealousy.enabled = cfg.jealous !== false;
     followOn = cfg.follow !== false;
@@ -712,6 +716,7 @@ async function boot() {
     panel.labels = linesFor(cfg.lang, cfg.assistant, brain.character);
     switchCharacter(cfg.character);
     if (cfg.scale !== capri.scale) capri.setScale(cfg.scale);
+    if (cfg.characterFraming !== capri.framing) capri.setFraming(cfg.characterFraming);
     if (cfg.lang !== brain.lang) {
       // Recreate open guides and chat controls too, so no old-language buttons remain.
       window.location.reload();

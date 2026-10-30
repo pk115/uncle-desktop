@@ -8,7 +8,8 @@ export const SPRITE = {
   shoulder: { x: 120, y: 220 }, hand: { x: 35, y: 250 }, mirror: 320,
 };
 
-// While she talks: a small stretch up from her feet, eased toward the loudness (no atlas has mouth frames).
+// Small audio-driven body motion complements authored mouth frames; older
+// character atlases still use this as their speech feedback.
 function talkStretch(ctx, renderer, talk = 0) {
   renderer.talk = reducedMotion.matches ? 0 : lerp(renderer.talk || 0, talk, 0.5);
   if (renderer.talk < 0.01) return;
@@ -39,6 +40,21 @@ export function frameFor(state, elapsed, fps = 4, still = false) {
   return row * 4 + column;
 }
 
+export function sourceRect(character, framing = 'full') {
+  return framing === 'bust'
+    ? (character.bustCrop || { x: 55, y: 14, width: 210, height: 275.625 })
+    : { x: 0, y: 0, width: SPRITE.width, height: SPRITE.height };
+}
+
+export function speakingFrame(state, elapsed, fps, still, talk, expressive) {
+  // Authored attention frames have closed, open and rounded mouths. This is
+  // audio-driven expression switching, not phoneme-level lip sync.
+  if (expressive && talk > 0.04 && state !== 'sleep' && state !== 'error' && !still) {
+    return 8 + (talk < 0.15 ? 3 : 1 + Math.floor(elapsed / 140) % 2);
+  }
+  return frameFor(state, elapsed, fps, still);
+}
+
 export class CharacterRenderer {
   constructor(canvas, image, character) {
     if (image.naturalWidth !== character.columns * SPRITE.width || image.naturalHeight !== character.rows * SPRITE.height) {
@@ -63,8 +79,16 @@ export class CharacterRenderer {
     this.frame = frame;
     const { width, height } = SPRITE;
     this.frameCtx.clearRect(0, 0, width, height);
-    this.frameCtx.drawImage(this.image, frame % 4 * width, Math.floor(frame / 4) * height, width, height, 0, 0, width, height);
+    const crop = sourceRect(this.character, this.framing);
+    this.frameCtx.drawImage(this.image, frame % 4 * width + crop.x, Math.floor(frame / 4) * height + crop.y, crop.width, crop.height, 0, 0, width, height);
     this.pixels = this.frameCtx.getImageData(0, 0, width, height).data;
+  }
+
+  setFraming(framing) {
+    this.framing = framing === 'bust' ? 'bust' : 'full';
+    const frame = this.frame;
+    this.frame = -1;
+    this.selectFrame(frame);
   }
 
   resize(scale) {
@@ -87,7 +111,7 @@ export class CharacterRenderer {
       this.state = state;
       this.started = now;
     }
-    this.selectFrame(frameFor(state, now - this.started, this.character.fps, reducedMotion.matches));
+    this.selectFrame(speakingFrame(state, now - this.started, this.character.fps, reducedMotion.matches, context.talk, this.character.expressive));
     const { ctx, canvas } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -98,7 +122,9 @@ export class CharacterRenderer {
     ctx.globalAlpha = clamp((p.alpha ?? 1) * (1 - (p.dissolve || 0)), 0, 1);
     ctx.translate(SPRITE.pad + SPRITE.width / 2, SPRITE.pad);
     ctx.scale(Math.max(0.01, 1 - (p.collapse || 0)), 1);
-    ctx.drawImage(this.frameCanvas, -SPRITE.width / 2, 0);
+    // From the atlas, not frameCanvas: a bust crop resampled twice comes out blurry.
+    const crop = sourceRect(this.character, this.framing), f = this.frame;
+    ctx.drawImage(this.image, f % 4 * SPRITE.width + crop.x, Math.floor(f / 4) * SPRITE.height + crop.y, crop.width, crop.height, -SPRITE.width / 2, 0, SPRITE.width, SPRITE.height);
     ctx.restore();
   }
 }

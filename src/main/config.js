@@ -7,6 +7,7 @@ const { app } = require('electron');
 const DEFAULTS = {
   characterId: 'angry-boy',
   scale: 0.6,        // sprite scale, 0.6 ≈ 250px tall
+  characterFraming: 'full', // full body or enlarged upper body
   muted: false,
   volume: 0.7,
   lang: 'th',        // Thai by default; 'auto' follows the system language.
