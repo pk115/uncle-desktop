@@ -54,6 +54,16 @@ test('cancel aborts a pending cloud transcription', async () => {
   const pending = service.transcribe(wav16([new Float32Array(16000)], 16000), { provider: 'openai', cloudConsent: true }, 'secret');
   service.stop(); await assert.rejects(pending, /ยกเลิก/);
 });
+test('model install starts downloading, rejects a bad hash and leaves no partial file', { skip: process.platform !== 'win32' || process.arch !== 'x64' }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-install-test-'));
+  const urls = [];
+  const service = createListening({ directory, fetcher: async (url) => { urls.push(url); return { ok: true, body: [Buffer.from('not the pinned file')] }; } });
+  try {
+    await assert.rejects(service.install(() => {}, 'thai-medium'), /SHA256/);
+    assert.deepEqual(urls, ['https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip']);
+    assert.deepEqual(await fs.readdir(directory), []);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
 test('local STT uses argument array, forces Thai, and deletes temporary recordings', async () => {
   const { wav16 } = await audio;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-local-test-')); let input;
