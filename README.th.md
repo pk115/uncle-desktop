@@ -111,3 +111,7 @@ npm start
 ### 0.8.0 — Thai speech recognition
 
 Local Thai-tuned Thonburian medium, Gemini transcription, configurable pause duration and vocabulary, and a no-action voice test with model/timing diagnostics. See [Thai voice guide](docs/VOICE_COMMANDS_TH.md).
+
+### 0.8.1 — อัปเดตตัวเอง และขยับตามเสียงพูด
+
+โปรแกรมที่ติดตั้งแล้วจะเช็กรุ่นใหม่จาก GitHub Releases ตอนเปิดและทุก 6 ชั่วโมง ดาวน์โหลดเงียบๆ แล้วติดตั้งตอนปิดโปรแกรม และตัวละครจะขยับตามเสียงขณะอ่านคำตอบ ติดตั้ง 0.8.1 ด้วยมือครั้งเดียว รุ่นถัดไปจะมาเอง
