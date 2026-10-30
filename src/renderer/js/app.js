@@ -14,6 +14,7 @@ import { Speech } from './speech.js';
 import { Listening } from './listening.js';
 import { VoiceAgent } from './voice-agent.js';
 import { Computer } from './computer.js';
+import * as media from './media.js';
 import { Settings } from './settings.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
@@ -634,6 +635,11 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
+  // jobs from her main process that need Chromium: audio and video from your phone, decoded here
+  host.onRpc(async ({ id, name, args }) => {
+    try { host.rpcReply({ id, ok: true, value: await media[name](args) }); }
+    catch (err) { host.rpcReply({ id, ok: false, error: err.message }); }
+  });
   window.dev = { settings: settingsUI, computer:computerUI, voiceAgent:listeningUI.realtime, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
@@ -772,13 +778,54 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'ask-value') { // a value typed in her panel: VIP senders, a routine, LINE
+      const got = await guide.askText({ face: 'look', line: cmd.title, quote: cmd.hint, secret: Boolean(cmd.secret), placeholder: cmd.value || cmd.hint });
+      if (got?.text === undefined || got?.text === null) return;
+      try { panel.say({ kind: 'info', line: `${cmd.title}: ${await host.setValue(cmd.key, got.text)}`, hold: 6000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 9000 }); }
+      return;
+    }
+    if (cmd.name === 'news-list') { // a list in her News tab: topics, alert words, feeds, outlets to skip
+      const got = await guide.askText({ face: 'look', line: cmd.title, quote: cmd.hint, placeholder: cmd.value || cmd.hint });
+      if (got?.text === undefined || got?.text === null) return;
+      try { const list = await host.newsSet(cmd.key, got.text); panel.say({ kind: 'info', line: `${cmd.title}: ${list.join(', ') || '—'}`, hold: 5000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 8000 }); }
+      return;
+    }
+    if (cmd.name === 'telegram-pin') { // the PIN your phone adds to risky commands (/pr 1234)
+      const got = await guide.askText({ face: 'look', line: 'ตั้ง PIN 4–8 หลัก', quote: 'ใช้ต่อท้ายคำสั่งเสี่ยงจาก Telegram เช่น /pr 1234 · เก็บแบบแฮช ไม่เก็บตัวเลขจริง', secret: true, placeholder: '1234' });
+      if (!got?.text) return;
+      try { await host.telegramPin(got.text.trim()); panel.say({ kind: 'info', line: 'ตั้ง PIN แล้ว', hold: 5000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 8000 }); }
+      return;
+    }
+    if (cmd.name === 'telegram-token') { // her Telegram bot's token, pasted in her panel
+      const got = await guide.askText({ face: 'look', line: 'วาง bot token จาก @BotFather', quote: 'หน้าตาแบบ 123456789:AA… · ฉันเก็บแบบเข้ารหัสในเครื่อง', secret: true, placeholder: '123456789:AA…' });
+      if (!got?.text) return;
+      try { const bot = await host.telegramToken(got.text); panel.say({ kind: 'info', line: `เชื่อม @${bot} แล้ว ต่อไปกด "ผูกกับแชตของคุณ…" ในแท็บ Telegram`, hold: 8000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 9000 }); }
+      return;
+    }
     if (cmd.name === 'assistant-alert') { // her assistant: important mail, a meeting soon, or how setup went
       const link = cmd.link && /^https:\/\//.test(cmd.link) ? cmd.link : '';
       if (cmd.kind === 'mail' || cmd.kind === 'event') {
         voice.play('remind'); capri.wake();
         const line = cmd.kind === 'mail' ? `📧 เมลสำคัญจาก ${cmd.from.replace(/<[^>]*>/, '').trim() || 'ไม่ทราบชื่อ'}` : `📅 อีก ${cmd.minutes} นาที: ${cmd.summary}`;
-        const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), { id: 'ok', label: 'รับทราบ' }];
-        panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : '', actions, onAction: (id) => { if (id === 'open') host.openSite(link); panel.hide(); }, hold: null });
+        const asks = cmd.kind === 'mail'
+          ? { sum: ['สรุปให้', `สรุปเมล id ${cmd.id} (จาก ${cmd.from}) ให้หน่อย และบอกว่าต้องทำอะไรต่อไหม`], reply: ['ร่างตอบ', `ร่างคำตอบเมล id ${cmd.id} (จาก ${cmd.from}) ให้หน่อย ยังไม่ต้องส่ง`], task: ['เพิ่มเป็นงาน', `อ่านเมล id ${cmd.id} แล้วเพิ่มสิ่งที่ฉันต้องทำลงรายการงาน`] }
+          : { late: ['เลื่อน 15 นาที', `เลื่อนนัด "${cmd.summary}" (event id ${cmd.id}) ออกไป 15 นาที`] };
+        const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), ...Object.entries(asks).map(([id, [label]]) => ({ id, label })), { id: 'ok', label: 'รับทราบ' }];
+        panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : cmd.prep || '', actions, hold: null, onAction: async (id) => {
+          panel.hide();
+          if (id === 'open') host.openSite(link);
+          else if (asks[id]) { await chat.start(); chat.send(asks[id][1]); }
+        } });
+      } else if (cmd.kind === 'news' || cmd.kind === 'brief') { // a summary: in her bubble, and aloud if you like
+        voice.play('remind'); capri.wake();
+        const first = cmd.link || cmd.links?.[0]?.link;
+        const actions = [{ id: 'read', label: 'อ่านให้ฟัง' }, ...(first ? [{ id: 'open', label: 'เปิดข่าว' }] : []), { id: 'ok', label: 'รับทราบ', primary: true }];
+        panel.say({ kind: 'remind', face: 'smug', line: cmd.title, quote: cmd.text, actions, hold: null, onAction: (id) => { if (id === 'read') speechUI.play(`${cmd.title.replace(/^\W+/u, '')}. ${cmd.text}`).catch(() => {}); else if (id === 'open') host.openSite(first); if (id !== 'read') panel.hide(); } });
+        if (cmd.kind === 'brief' && (await host.getConfig()).briefs?.voice !== false) speechUI.play(cmd.text).catch(() => {});
       } else panel.say({ kind: cmd.kind === 'error' ? 'error' : 'info', line: cmd.message, hold: cmd.kind === 'error' ? 9000 : 6000 });
       return;
     }
