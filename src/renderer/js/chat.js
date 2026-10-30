@@ -1,3 +1,4 @@
+import { computerTask } from './computer-intent.js';
 // Talking to her: you type in her panel, and a model (setup.js picks which) answers as her, in
 // writing. The replies are AI-generated, and the panel says so on every chat.
 // She can do a few things on your PC when you ask (Windows): open an app or a game, play music or
@@ -260,8 +261,8 @@ export class Chat {
     capri.nextMove = capri.nextGaze = performance.now() + STAY_MS;
   }
 
-  close() {
-    this.onSpeechStop?.();
+  close({keepListening=false}={}) {
+    if(!keepListening)this.onSpeechStop?.();
     if (!this.open) return;
     this.open = false;
     if (this.turn) this.host.chatStop(this.turn);
@@ -273,6 +274,8 @@ export class Chat {
 
   async send(text) {
     if (this.turn || !this.open) return;
+    const job=computerTask(text);
+    if(job&&this.onComputer){await this.onComputer(job,{voice:false});return;}
     const id = Date.now();
     this.turn = id;
     this.answer = '';

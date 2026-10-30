@@ -22,7 +22,8 @@
     "check:llm": "node scripts/check-llm.js",
     "test:hooks": "node --test tests/hooks.test.js",
     "dist": "electron-builder --win",
-    "release": "electron-builder --win --publish always"
+    "release": "electron-builder --win --publish always",
+    "test:computer:live": "node scripts/smoke-computer.js"
   },
   "keywords": [
     "desktop-companion",
@@ -62,12 +63,16 @@
       "README.md",
       "README.th.md",
       "README.upstream.md",
-      "docs/*.md"
+      "docs/*.md",
+      "!scripts/live-*.js"
     ],
     "asarUnpack": [
       "hooks/**",
       "src/main/windows.ps1",
-      "src/main/speech.ps1"
+      "src/main/speech.ps1",
+      "src/main/computer.ps1",
+      "src/main/computer-native.cs",
+      "src/main/computer-audio.cs"
     ],
     "win": {
       "target": "nsis",

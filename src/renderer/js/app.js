@@ -12,6 +12,7 @@ import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
+import { Computer } from './computer.js';
 import { Settings } from './settings.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
@@ -46,6 +47,7 @@ async function boot() {
   let speechUI = null;
   let listeningUI = null;
   let settingsUI = null;
+  let computerUI = null;
   const loadCharacter = (character) => Promise.all([
     loadImage(characterAsset(character, 'atlas')),
     loadImage(characterAsset(character, 'portrait')),
@@ -132,7 +134,7 @@ async function boot() {
   };
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
-    if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open) return setInteractive(true);
+    if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open || computerUI?.open) return setInteractive(true);
     if (capri.dragging) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
@@ -142,8 +144,9 @@ async function boot() {
     const onSpeech = !stop.hidden && mouse.x >= s.left && mouse.x <= s.right && mouse.y >= s.top && mouse.y <= s.bottom;
     const micStop = document.getElementById('listening-stop'); const micRect = micStop.getBoundingClientRect();
     const onMic = !micStop.hidden && mouse.x >= micRect.left && mouse.x <= micRect.right && mouse.y >= micRect.top && mouse.y <= micRect.bottom;
+    const pcStop=document.getElementById('computer-stop'), pcRect=pcStop.getBoundingClientRect();const onComputer=!pcStop.hidden&&mouse.x>=pcRect.left&&mouse.x<=pcRect.right&&mouse.y>=pcRect.top&&mouse.y<=pcRect.bottom;
     document.body.style.cursor = onChip() ? 'pointer' : '';
-    return setInteractive(Boolean(onPanel || onSpeech || onMic || capri.hit(mouse.x, mouse.y) || onChip()));
+    return setInteractive(Boolean(onPanel || onSpeech || onMic || onComputer || capri.hit(mouse.x, mouse.y) || onChip()));
   };
   // Her biochip: her eyes on it follow the pointer over it, and she comes out when you click it
   // (only then, so the pointer passing through that corner doesn't call her back).
@@ -309,9 +312,29 @@ async function boot() {
   });
   listeningUI.configure(config);
   settingsUI = new Settings({ host, root: document.getElementById('all-settings'),
-    onOpen: (id) => ({ ai: () => setup.chat(), characters: () => picker.show(), speech: () => speechUI.show(), listening: () => listeningUI.show(), customize: () => custom.open() })[id](),
+    onOpen: (id) => ({ ai: () => setup.chat(), characters: () => picker.show(), speech: () => speechUI.show(), listening: () => listeningUI.show(), computer: () => computerUI.show(), customize: () => custom.open() })[id](),
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open || listeningUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
   });
+  computerUI = new Computer({host,root:document.getElementById('computer-settings'),indicator:document.getElementById('computer-stop'),
+    onVisibility:open=>{capri.pickerOpen=open||picker.open||speechUI.open||listeningUI.open||settingsUI.open;host.focusOverlay(open);if(open)setInteractive(true);else refreshHit();},
+    onStart:({voice})=>{if(!voice)listeningUI.stop();listeningUI.externalJob=voice;speechUI.stop();chat.close({keepListening:voice});panel.hide();picker.hide();speechUI.hide();listeningUI.hide();settingsUI.hide();},
+    onPermission:request=>listeningUI.requestConfirmation(request),
+    onQuestion:state=>{if(!state.voice)return false;if(listeningUI.realtime?.ask(state))return true;
+      listeningUI.requestConfirmation({question:state.question,acceptYes:true,
+        ...(state.answerNeeded?{clarify:answer=>computerUI.answerState(state,true,answer)}:{execute:()=>computerUI.answerState(state,true)}),
+        cancel:()=>computerUI.answerState(state,false).catch(()=>{}),
+      });return true;
+    },
+    onState:state=>{
+      listeningUI.externalJob=state.voice&&['running','confirm'].includes(state.status);
+      if(state.voice&&!['running','confirm'].includes(state.status)){
+        listeningUI.clearConfirmation();listeningUI.followUntil=Date.now()+10000;
+        listeningUI.speakFeedback(state.message).then(async()=>{while(speechUI.active)await new Promise(r=>setTimeout(r,100));if(listeningUI.settings?.mode==='push'&&!listeningUI.externalJob)listeningUI.releaseMic();});
+      }
+    },
+  });
+  chat.onComputer = (text,options) => computerUI.request(text,options);
+  listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
   chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
   chat.onSpeechStop = () => { speechUI.stop(); listeningUI.stop(); };
   brain.onTalk = () => chat.start();
@@ -593,7 +616,7 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
-  window.dev = { capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
+  window.dev = { computer:computerUI, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
   host.onWindows((data) => {
@@ -729,6 +752,26 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if(cmd.name==='computer-companion'){
+      const action=cmd.action;
+      if(action==='sleep')capri.setMode('sleep');
+      else if(action==='wake')capri.wake();
+      else if(action==='come_here')await capri.toPointer(await host.cursor());
+      else if(action==='next_monitor'){const list=await host.screens();const next=list?.list?.find(d=>d.id!==list.current);if(next)goToScreen(next.id);}
+      else if(action==='sit'){const seat=capri.pickSeat();if(seat)capri.sitOn(seat);else capri.arrive(capri.pos,{stance:'sit'});}
+      else if(action==='stand')await capri.arrive(capri.pos,{stance:'stand'});
+      else if(action==='hang')await capri.peek('top');
+      else if(action==='ride_cursor'){clearInterval(window.__uncleRide);window.__uncleRide=setInterval(async()=>{if(capri.dragging){clearInterval(window.__uncleRide);return;}const cursor=await host.cursor();if(cursor?.inside)capri.pos={x:cursor.x+30,y:cursor.y+30};},80);}
+      else if(action==='leave_cursor')clearInterval(window.__uncleRide);
+      else if(action==='dance'){clearInterval(window.__uncleDance);window.__uncleDance=setInterval(()=>capri.perform('hop'),1200);}
+      else if(action==='stop_dance')clearInterval(window.__uncleDance);
+      else if(action==='idle')capri.setMode('idle');
+      else if(action==='smile')capri.perform('victory');
+      else if(action==='blink')capri.perform('look');
+      else if(action==='glitch')capri.perform('split');
+      return;
+    }
+    if (cmd.name === 'computer') {picker.hide();speechUI.hide();listeningUI.hide();settingsUI.hide();await computerUI.show();return;}
     if (cmd.name === 'settings') { picker.hide(); speechUI.hide(); listeningUI.hide(); await settingsUI.show(); return; }
     const t = brain.t;
     switch (cmd.name) {

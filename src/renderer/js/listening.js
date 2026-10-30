@@ -1,3 +1,4 @@
+import { computerTask } from './computer-intent.js';
 import { Utterance, wakeCommand } from './listening-audio.js';
 import { confirmationAnswer, runVoiceCommand } from './voice-commands.js';
 const el = (tag, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
@@ -33,7 +34,7 @@ export class Listening {
     this.startButton = el('button', '🎤 เริ่มฟัง'); this.startButton.onclick = () => this.toggle();
     const stop = el('button', '■ ปิดไมค์ / ยกเลิก'); stop.onclick = () => this.stop();
     const save = el('button', 'บันทึก'); save.onclick = async () => { try { await this.save(); this.setStatus('บันทึกแล้ว'); } catch (e) { this.error(e); } };
-    this.testing = false; const test = el('button', 'ทดสอบเสียง / คำเรียก (ไม่ส่งคำสั่ง)'); test.onclick = async () => { try { await this.begin(true); } catch (e) { this.error(e); } };
+    this.testing = false; const test = this.testButton = el('button', 'ทดสอบเสียง / คำเรียก (ไม่ส่งคำสั่ง)'); test.onclick = async () => { try { await this.begin(true); } catch (e) { this.error(e); } };
     actions.append(this.startButton, stop, test, save); box.append(actions);
     this.level = el('meter'); this.level.min = 0; this.level.max = 0.1; this.level.setAttribute('aria-label', 'ระดับเสียงไมค์'); box.append(this.level);
     this.status = el('p', 'ไมค์ปิดอยู่'); this.status.className = 'speech-status'; this.status.setAttribute('role', 'status'); box.append(this.status);
@@ -117,7 +118,7 @@ export class Listening {
   }
   expireConfirmation() {
     if (!this.confirmation || Date.now() < this.confirmation.until) return;
-    this.clearConfirmation(); this.host.listeningStop(); this.followUntil = 0; this.lastResultStatus = 'ยกเลิกคำสั่งแล้ว เพราะไม่ได้รับคำยืนยันภายในเวลา'; this.setStatus(this.lastResultStatus);
+    const expired=this.confirmation;this.clearConfirmation();expired?.cancel?.(); this.host.listeningStop(); this.followUntil = 0; this.lastResultStatus = 'ยกเลิกคำสั่งแล้ว เพราะไม่ได้รับคำยืนยันภายในเวลา'; this.setStatus(this.lastResultStatus);
     if (this.settings?.mode === 'push') this.releaseMic();
   }
   async answerConfirmation(text) {
@@ -125,20 +126,22 @@ export class Listening {
     if (Date.now() >= request.until) { this.expireConfirmation(); return; }
     const answer = confirmationAnswer(text);
     if (answer === null && !request.clarify) { this.setStatus('ยังไม่ได้ทำคำสั่ง กรุณาตอบ “ใช่” หรือ “ยกเลิก”'); await this.speakFeedback('กรุณาตอบใช่ หรือยกเลิกค่ะ'); return; }
-    if (request.clarify && answer === true) { await this.speakFeedback(request.question); return; }
-    this.clearConfirmation(); this.speech.stop();
+    if (request.clarify && answer === true && !request.acceptYes) { await this.speakFeedback(request.question); return; }
+    this.clearConfirmation(); this.hide(); this.speech.stop();
     const serial = this.serial;
     this.submitting = true;
     try {
-      if (answer === false) await this.respond('ยกเลิกคำสั่งแล้วค่ะ');
+      if (answer === false) {await request.cancel?.();await this.respond('ยกเลิกคำสั่งแล้วค่ะ');}
       else if (request.clarify) await request.clarify(text);
       else { const result = await request.execute(); if (serial === this.serial && typeof result === 'string') await this.respond(result); }
       if (serial === this.serial) this.followUntil = Date.now() + this.settings.followSeconds * 1000;
     } finally {
-      if (serial === this.serial) { this.submitting = false; if (this.settings.mode === 'push' && !this.confirmation) this.releaseMic(); }
+      if (serial === this.serial) { this.submitting = false; if (this.settings.mode === 'push' && !this.confirmation && !this.externalJob) this.releaseMic(); }
     }
   }
   async execute(text, screenConfirmed = false) {
+    const job=computerTask(text);
+    if(job&&this.chat.onComputer){await this.chat.onComputer(job,{voice:true});return;}
     const serial = this.serial;
     const handled = !screenConfirmed && await runVoiceCommand({ chat: this.chat, text,
       ask: request => { if (serial === this.serial) this.requestConfirmation(request); },
@@ -194,7 +197,7 @@ export class Listening {
     if (this.processing || this.pending || !this.stream) return;
     const confirmation = this.confirmation;
     this.processing = true; const serial = this.serial;
-    const waking = !this.confirmation && this.settings.mode === 'wake' && Date.now() >= this.followUntil;
+    const waking = !this.confirmation && !this.externalJob && this.settings.mode === 'wake' && Date.now() >= this.followUntil;
     this.setStatus(waking ? 'ตรวจคำเรียกในเครื่อง…' : 'กำลังถอดเสียง…');
     try {
       const result = await this.host.listeningTranscribe(bytes, waking);
@@ -209,6 +212,7 @@ export class Listening {
         this.lastResultStatus = waking ? match === null ? 'ทดสอบ: ไม่พบคำเรียก — ไม่มีการส่งคำสั่ง' : 'ทดสอบ: พบคำเรียก — ไม่มีการส่งคำสั่ง' : 'ทดสอบเสร็จ — ไม่มีการส่งคำสั่ง';
         this.setStatus(this.lastResultStatus); if (this.settings.mode === 'push') this.releaseMic(); return;
       }
+      if (this.externalJob && !this.confirmation) {await this.onJobControl?.(wakeCommand(text,this.settings.wakeWords)??text);return;}
       if (this.confirmation) { await this.answerConfirmation(wakeCommand(text, this.settings.wakeWords) ?? text); return; }
       if (waking) {
         const command = wakeCommand(text, this.settings.wakeWords);
@@ -243,7 +247,7 @@ export class Listening {
       this.transcript.value = text; this.sendButton.disabled = false; this.pending = true;
       if (this.settings.review) { this.setStatus('ตรวจข้อความแล้วกดส่ง หรือยกเลิก'); await this.show(); }
       else await this.submit();
-      if (this.settings.mode === 'push' && serial === this.serial && !this.confirmation) this.releaseMic();
+      if (this.settings.mode === 'push' && serial === this.serial && !this.confirmation && !this.externalJob) this.releaseMic();
     } catch (error) { if (serial === this.serial && (!confirmation || this.confirmation === confirmation)) throw error; }
     finally { if (serial === this.serial) { this.processing = false; if (!this.pending && this.stream && !waking) this.idle(); } }
   }
@@ -264,5 +268,5 @@ export class Listening {
     this.context?.close().catch(() => {}); this.context = null; this.utterance?.reset(); this.level.value = 0;
     this.indicator.hidden = true; this.startButton.textContent = '🎤 เริ่มฟัง';
   }
-  stop() { this.serial++; this.clearConfirmation(); this.releaseMic(); this.host.listeningStop(); this.processing = false; this.pending = false; this.followUntil = 0; this.submitting = false; this.lastResultStatus = ''; if (this.sendButton) this.sendButton.disabled = true; this.setStatus('ไมค์ปิดอยู่'); }
+  stop() { const pending=this.confirmation;this.serial++;pending?.cancel?.(); this.clearConfirmation(); this.releaseMic(); this.host.listeningStop(); this.processing = false; this.pending = false; this.followUntil = 0; this.submitting = false; this.lastResultStatus = ''; if (this.sendButton) this.sendButton.disabled = true; this.setStatus('ไมค์ปิดอยู่'); }
 }

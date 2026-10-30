@@ -1,7 +1,7 @@
 export function confirmationAnswer(text) {
   const value = String(text || '').toLowerCase().replace(/[\p{P}\p{S}\s]/gu, '').replace(/(?:นะครับ|นะคะ|ครับ|ค่ะ|คะ|นะ)$/, '');
   if (/^(?:ไม่|ไม่ใช่|ไม่ต้อง|ไม่ต้องทำ|ยกเลิก|หยุด|อย่าทำ|no|nope|cancel|stop)$/.test(value)) return false;
-  if (/^(?:ใช่|ใช่แล้ว|ยืนยัน|ตกลง|ทำเลย|เอาเลย|ได้เลย|yes|yeah|confirm|ok|okay)$/.test(value)) return true;
+  if (/^(?:ใช่|ใช่แล้ว|พร้อมแล้ว|เรียบร้อยแล้ว|ทำต่อ|ยืนยัน|ตกลง|ทำเลย|เอาเลย|ได้เลย|yes|yeah|confirm|ok|okay)$/.test(value)) return true;
   return null;
 }
 

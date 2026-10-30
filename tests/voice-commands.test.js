@@ -6,7 +6,7 @@ const commands = import('../src/renderer/js/voice-commands.js');
 async function controller() {
   const { Listening } = await import('../src/renderer/js/listening.js');
   const v = Object.create(Listening.prototype);
-  Object.assign(v, { serial: 1, settings: { mode: 'wake', followSeconds: 10 }, stream: {}, status: {}, indicator: {}, transcript: {}, sendButton: {}, confirmButtons: {}, speech: { active: false, play: async () => {}, stop() {} }, host: { listeningStop() {} }, releaseMic() {}, onVisibility() {}, chat: {}, responses: [] });
+  Object.assign(v, { serial: 1, settings: { mode: 'wake', followSeconds: 10 }, stream: {}, status: {}, indicator: {}, transcript: {}, sendButton: {}, confirmButtons: {}, speech: { active: false, play: async () => {}, stop() {} }, host: { listeningStop() {} }, releaseMic() {}, hide() {}, onVisibility() {}, chat: {}, responses: [] });
   v.respond = async text => v.responses.push(text);
   return v;
 }

@@ -40,7 +40,7 @@ const DEFAULTS = {
   pcReact: true,     // she reacts to your PC: the processor at full tilt, the battery, the network, a USB stick, a game (pc.js)
   watchScreen: false, // she looks at your screen now and then and says something about it (look.js)
   lookAsked: false,  // she told you what looking means (where the picture goes) and you said yes
-  hotkeys: { toggle: 'Control+Alt+C', voice: 'Control+Alt+V', mute: 'Control+Alt+M' }, // '' turns one off (her settings)
+  hotkeys: { stopJob: 'Control+Alt+X', toggle: 'Control+Alt+C', voice: 'Control+Alt+V', mute: 'Control+Alt+M' }, // '' turns one off (her settings)
   learn: true,       // after a few exchanges she notes what she learned about you in me.md (not with Claude Code)
 };
 
