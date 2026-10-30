@@ -678,6 +678,10 @@ function rebuildTray() {
     ] },
   ];
 
+  // the AI's provider, brain tier and model, quickly: her AI menu's choices without its actions
+  const choices = item.chat.submenu.filter((it) => it.type === 'radio' || it.type === 'separator' || it.enabled === false)
+    .filter((it, i, all) => it.type !== 'separator' || (i > 0 && all[i - 1].type !== 'separator' && i < all.length - 1));
+  const quickModel = { label: `${th ? 'โมเดล AI' : 'AI model'}: ${pickModel(cfg) || (th ? 'ยังไม่ได้เลือก' : 'none yet')}`.slice(0, 60), submenu: choices };
   // her right-click and tray menu: what you reach for every day; the rest is under Settings…
   const menu = Menu.buildFromTemplate([
     { label: t.sync(Math.min(100, Math.floor(xp / 10)), t.stages[stage]), enabled: false },
@@ -686,6 +690,9 @@ function rebuildTray() {
     { label: th ? 'เริ่มพูด / ปิดไมค์' : 'Talk / stop mic', accelerator: hotkeys().voice || undefined, click: () => sendCommand('listening-toggle') },
     { label: t.lookNow, click: () => sendCommand('look') },
     item.quick,
+    item.size,
+    item.view,
+    quickModel,
     { label: t.mute, type: 'checkbox', checked: cfg.muted, click: (it) => updateConfig({ muted: it.checked }) },
     item.visible,
     ...(computer?.busy ? [{ label: th ? 'หยุดงานควบคุมเครื่อง' : 'Stop computer job', accelerator: hotkeys().stopJob || undefined, click: () => computer?.stop() }] : []),
