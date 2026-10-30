@@ -128,10 +128,35 @@
 @media (prefers-reduced-motion: reduce) { .character-picker button { transition: none; } }
 #all-settings .speech-box::before { content: 'UNCLE // MAINFRAME'; }
 .settings-box h2 { margin: 14px 0 4px; font-size: 16px; color: var(--green); }
-.settings-row { display: grid; grid-template-columns: 9em 1fr auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--ink-2); font-size: 14px; }
-.settings-row span { color: var(--paper-2); overflow-wrap: anywhere; }
-.settings-row button { margin-right: 0; }
 
 .computer-stop { top: 16px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); max-width: min(85vw, 640px); z-index: 150; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #computer-settings .speech-box::before { content: "UNCLE // COMPUTER CONTROL"; }
+
+/* setup wizard (settings.js): steps on the left, the step on the right */
+.settings-box { width: min(980px, 100%); }
+.wizard { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; min-height: 0; }
+.wizard-steps { display: flex; flex-direction: column; gap: 4px; border-right: 1px solid var(--violet); padding-right: 16px; }
+.speech-box .wizard-step { text-align: left; border: 0; background: none; padding: 10px; margin: 0; color: var(--paper-2); font-size: 14px; }
+.speech-box .wizard-step.is-done { color: var(--green); }
+.speech-box .wizard-step[aria-current] { background: var(--ink-2); color: var(--paper); border-left: 3px solid var(--green); font-weight: 700; }
+.speech-box .wizard-step--more { margin-top: auto; border-top: 1px solid var(--ink-2); }
+.wizard-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow-y: auto; }
+.speech-box .wizard-body h1 { margin: 0; }
+.speech-box .wizard-count { color: var(--green); font: 600 11px var(--font-mono); letter-spacing: .12em; margin: 0; }
+.speech-box .wizard-choice { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left; padding: 12px 14px; margin: 0; }
+.speech-box .wizard-choice small { grid-column: 1 / -1; color: var(--paper-2); font-size: 13px; }
+.speech-box .wizard-choice.is-recommended { border: 2px solid var(--green); }
+.wizard-badge { background: var(--green); color: var(--ink); font-size: 11px; padding: 2px 8px; align-self: start; }
+.speech-box .wizard-state { border-left: 3px solid var(--red); background: var(--ink-2); padding: 8px 12px; color: var(--paper); }
+.speech-box .wizard-state.is-ok { border-left-color: var(--green); color: var(--green); }
+.wizard-characters { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.speech-box .wizard-character { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; margin: 0; font-size: 12px; }
+.wizard-character img { width: 72px; height: 72px; object-fit: cover; }
+.speech-box [aria-pressed=true] { border: 2px solid var(--green); color: var(--green); }
+.wizard-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.speech-box .wizard-link { border: 0; background: none; color: var(--green); text-decoration: underline; padding: 4px 0; align-self: start; }
+.speech-box .wizard-progress { color: var(--green); min-height: 1em; }
+.wizard-footer { margin-top: 8px; }
+@media (max-width: 720px) { .wizard { grid-template-columns: 1fr; } .wizard-steps { border-right: 0; flex-direction: row; overflow-x: auto; } }
+.settings-box .speech-status:empty { display: none; }

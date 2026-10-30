@@ -14,3 +14,11 @@ test('key presses become accelerators by physical key, whatever the keyboard lay
   assert.equal(press('ControlLeft', { ctrlKey: true }), null); // a modifier alone isn't a key
   assert.equal(press('Semicolon', { ctrlKey: true }), null);
 });
+
+test('the setup wizard opens on the first required step not done, skipping optional ones', async () => {
+  const { firstOpenStep, STEPS } = await import(pathToFileURL(path.join(__dirname, '../src/renderer/js/settings.js')));
+  const at = (done) => STEPS[firstOpenStep(done)][0];
+  assert.equal(at({}), 'character');
+  assert.equal(at({ character: true }), 'ai');
+  assert.equal(at({ character: true, ai: true }), 'finish'); // voice, mic and coding AI are optional
+});

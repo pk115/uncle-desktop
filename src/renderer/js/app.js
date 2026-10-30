@@ -315,6 +315,9 @@ async function boot() {
   settingsUI = new Settings({ host, root: document.getElementById('all-settings'),
     onOpen: (id) => ({ ai: () => setup.chat(), characters: () => picker.show(), speech: () => speechUI.show(), listening: () => listeningUI.show(), computer: () => computerUI.show(), customize: () => custom.open() })[id](),
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open || listeningUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+    portrait: (character) => characterAsset(character, 'portrait'),
+    runAI: (choice) => guide.scene(() => (choice === 'local' ? setup.ollama() : choice === 'key' ? setup.pickKeyed() : setup.use('pollinations'))),
+    onTalk: () => chat.start(),
   });
   computerUI = new Computer({host,root:document.getElementById('computer-settings'),indicator:document.getElementById('computer-stop'),
     onVisibility:open=>{capri.pickerOpen=open||picker.open||speechUI.open||listeningUI.open||settingsUI.open;host.focusOverlay(open);if(open)setInteractive(true);else refreshHit();},
@@ -619,7 +622,7 @@ async function boot() {
   };
 
   // what's in here, for --dev scripts (debug route `eval`)
-  window.dev = { computer:computerUI, voiceAgent:listeningUI.realtime, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
+  window.dev = { settings: settingsUI, computer:computerUI, voiceAgent:listeningUI.realtime, capri, brain, panel, chat, guide, fx, voice, bond, jealousy, reminders, look, pc, setup, picker, speech: speechUI, listening: listeningUI, screens: () => screens };
 
   host.onClaudeEvent((evt) => brain.handle(evt));
   host.onWindows((data) => {
@@ -969,7 +972,9 @@ async function boot() {
   }
   const hooks = await host.hooksStatus();
   // her welcome: the first time, or while she's meant to watch Claude Code and isn't plugged into it
-  if (!config.welcomed || (config.claude && !hooks.installed)) guide.welcome();
+  // first launch: her setup, step by step (settings.js); later, her welcome while Claude Code isn't plugged in
+  if (!config.welcomed) settingsUI.show();
+  else if (config.claude && !hooks.installed) guide.welcome();
   else panel.say({ kind: 'info', line: brain.onlineLine(), hold: 4000 });
 
   // In the evening, after a real day's work, she brings you her report card once, on her own,
