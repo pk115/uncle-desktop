@@ -75,6 +75,59 @@ function saveMemory(patch, characterId) {
     console.error('[capri] could not save her memory:', err.message);
   }
 }
+// Two files she reads before she answers, open in Notepad from her settings: personality.md (how you
+// want her) and me.md (what she knows of you, which she also adds to herself, see learnAboutUser).
+// Lines starting with # are notes for you, not for her.
+const NOTES = {
+  personality: { file: 'personality.md', template: '# บุคลิกของตัวละคร: เขียนว่าอยากให้เป็นแบบไหน เช่น พูดสุภาพ เรียกฉันว่าพี่ ชอบแซวเรื่องกาแฟ\n# บรรทัดที่ขึ้นต้นด้วย # จะไม่ถูกส่งให้ AI\n\n' },
+  me: { file: 'me.md', template: '# สิ่งที่ตัวละครรู้เกี่ยวกับคุณ: เธอเพิ่มบรรทัดใหม่เองหลังคุยกัน แก้หรือลบได้ตามใจ\n# บรรทัดที่ขึ้นต้นด้วย # จะไม่ถูกส่งให้ AI\n\n' },
+};
+const NOTES_MAX = 4000; // characters of each sent with every message
+const notesFile = (name) => path.join(app.getPath('userData'), NOTES[name].file);
+function readNotes(name) {
+  try {
+    const text = fs.readFileSync(notesFile(name), 'utf8').split(/\r?\n/).filter((line) => !line.startsWith('#')).join('\n').trim();
+    return name === 'me' ? text.slice(-NOTES_MAX) : text.slice(0, NOTES_MAX); // what she learned last counts most
+  } catch {
+    return '';
+  }
+}
+function openNotes(name) {
+  const file = notesFile(name);
+  if (!fs.existsSync(file)) fs.writeFileSync(file, NOTES[name].template);
+  // Notepad, not the .md association: often none on Windows
+  require('node:child_process').spawn('notepad.exe', [file], { detached: true, stdio: 'ignore' }).on('error', () => shell.showItemInFolder(file)).unref();
+  return '';
+}
+
+// Every few exchanges, her AI is asked what lasting things it learned about you, added to me.md.
+// Not with Claude Code: its chat is one session, a side question would land in it.
+const LEARN_EVERY = 5; // exchanges
+let unlearned = 0;
+async function learnAboutUser(history) {
+  const cfg = config.load();
+  if (!cfg.learn || cfg.provider === 'claude') return;
+  const talk = history.slice(-LEARN_EVERY * 2)
+    .filter((m) => typeof m?.content === 'string' && ['user', 'assistant'].includes(m.role))
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 1000)}`).join('\n');
+  if (!talk) return;
+  const known = readNotes('me');
+  const messages = [
+    { role: 'system', content: 'You keep long-term notes about a user for their desktop companion. From the conversation, write only NEW lasting facts about the user worth remembering for weeks: name, preferences, work, projects, people, plans, habits. One short fact per line, each starting with "- ", in the language of the conversation. Never note passwords, keys, money details or anything else secret. Skip what the notes already say. If there is nothing new, answer exactly NONE.' },
+    { role: 'user', content: `Notes so far:\n${known || '(none)'}\n\nConversation:\n${talk}` },
+  ];
+  try {
+    const text = await chatWithFallback(cfg, messages, () => {}, AbortSignal.timeout(90000), () => false);
+    const facts = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^- \S/.test(line) && !known.includes(line.slice(2))).slice(0, 5);
+    if (!facts.length) return;
+    const file = notesFile('me');
+    if (!fs.existsSync(file)) fs.writeFileSync(file, NOTES.me.template);
+    fs.appendFileSync(file, `${facts.join('\n')}\n`);
+  } catch (err) {
+    console.warn('[uncle] could not learn from the chat:', err.message);
+  }
+}
+
 function forgetChats() {
   llm.resetClaude();
   saveMemory({ history: [], claude: null });
@@ -875,8 +928,15 @@ function registerIpc() {
     return { local: llm.isLocal(cfg.provider, cfg, model), provider, model };
   });
   ipcMain.handle('chat:memory', () => readMemory().history || []);
+  ipcMain.handle('notes:get', () => ({ personality: readNotes('personality'), me: readNotes('me') }));
+  ipcMain.handle('notes:open', (_e, name) => (name in NOTES ? openNotes(name) : 'unknown notes'));
   ipcMain.on('chat:remember', (_e, { history, characterId } = {}) => {
-    if (Array.isArray(history) && CHARACTERS.some((c) => c.id === characterId)) saveMemory({ history }, characterId);
+    if (!Array.isArray(history) || !CHARACTERS.some((c) => c.id === characterId)) return;
+    saveMemory({ history }, characterId);
+    if (++unlearned >= LEARN_EVERY) {
+      unlearned = 0;
+      learnAboutUser(history);
+    }
   });
   ipcMain.on('chat:ollama', () => shell.openExternal(OLLAMA_SITE));
   // setting her up with buttons (setup.js): Ollama and a model, or a key, or an address

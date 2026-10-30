@@ -216,6 +216,7 @@ export class Chat {
       return;
     }
     this.history = await host.chatMemory().catch(() => this.history); // "forget" in her menu may have emptied it
+    this.notes = await host.notes().catch(() => this.notes); // personality.md and me.md, maybe just edited
     this.cold = status.warmup && !this.warm;
     this.agent = Boolean(status.agent); // Claude Code answers, as her, and really works in your project
     this.listApps();
@@ -787,6 +788,8 @@ export class Chat {
       userName ? `The user's name is ${userName}: call them that now and then.${notThem}` : notThem && `You don't know the user's name.${notThem}`,
       persona ? `How the user wants you to be, in their own words (follow it, while staying Capri): ${persona}` : '',
       memories.length ? `Things the user asked you to remember:\n${memories.map((m) => `- ${m}`).join('\n')}` : '',
+      this.notes?.personality ? `The user's personality file for you (follow it, while staying in character):\n${this.notes.personality}` : '',
+      this.notes?.me ? `What you have learned about the user over time (may be out of date, don't recite it):\n${this.notes.me}` : '',
     ].filter(Boolean);
   }
 
