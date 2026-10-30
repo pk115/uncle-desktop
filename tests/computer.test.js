@@ -52,3 +52,12 @@ test('direct voice media actions use the shared job gates without a second plann
  const c=createComputer({native,system:async a=>{tools++;assert.equal(a.action,'now_playing');return 'ไม่พบเพลง'},decide:async()=>{modelCalls++;throw Error('must not plan')},notify:s=>last=s});
  c.start({task:'current song',consent:true,voice:true,directAction:{tool:'media',action:'now_playing',reason:'ดูเพลง'}});while(c.busy)await wait();assert.equal(last.status,'done');assert.equal(tools,1);assert.equal(modelCalls,0);assert.equal(last.evidence,'ไม่พบเพลง');
 });
+test('security levels: trusted asks only for risky steps, blackwall never',()=>{
+ const view={app:{process:'chrome',title:'Shop'},targets:[{id:1,role:'Button',name:'Send'},{id:2,role:'Button',name:'Buy now'}]};
+ assert.ok(needsConfirmation({tool:'click',target:1},view,'guarded'));
+ assert.ok(!needsConfirmation({tool:'click',target:1},view,'trusted'));assert.ok(needsConfirmation({tool:'click',target:2},view,'trusted'));
+ assert.ok(needsConfirmation({tool:'power',action:'shutdown'},view,'trusted'));
+ assert.ok(!needsConfirmation({tool:'click',target:2},view,'blackwall'));assert.ok(!needsConfirmation({tool:'power',action:'shutdown'},view,'blackwall'));
+ const computer=createComputer({native:{request:async()=>({}),stop(){}},decide:async()=>''});
+ assert.throws(()=>computer.start({task:'x',consent:true,security:'yolo'}));
+});

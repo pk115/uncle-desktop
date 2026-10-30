@@ -10,8 +10,11 @@ export class Computer {
     this.consent=el('input');this.consent.type='checkbox';const consent=el('label');consent.append(this.consent,document.createTextNode(' อนุญาตอ่านชื่อหน้าต่างและข้อความในแอป ส่งให้ AI ที่เลือก และใช้เมาส์/คีย์บอร์ดสำหรับงานที่ฉันสั่ง (จำการอนุญาตไว้ ปิดได้ที่นี่)'));box.append(consent);
     this.voice=el('input');this.voice.type='checkbox';const voice=el('label');voice.append(this.voice,document.createTextNode(' ให้คำสั่งเสียงเริ่มงานได้อัตโนมัติ และถาม–ตอบขั้นตอนด้วยเสียง'));box.append(voice);
     this.images=el('input');this.images.type='checkbox';const images=el('label');images.append(this.images,document.createTextNode(' ใช้ภาพหน้าต่างด้วย — สำหรับแอปที่อ่านปุ่มไม่ได้ ต้องเลือก AI ที่รับภาพได้'));box.append(images);
-    box.append(el('p','ส่งเฉพาะข้อมูลของงานนี้ ไม่เก็บภาพลงไฟล์ · เมื่อพบช่องรหัสผ่านจะงดส่งภาพและไม่กรอกรหัสให้ · การส่ง/บันทึก/ลบหรือคลิกตามพิกัดจะรอยืนยัน'));
-    const actions=el('div');actions.className='speech-actions';this.start=el('button','▶ เริ่มทำงาน');this.start.onclick=()=>this.begin();const stop=el('button','■ หยุดงาน');stop.onclick=()=>host.computerStop();const save=el('button','บันทึกสิทธิ์');save.onclick=async()=>{try{await host.computerSave({consent:this.consent.checked,voice:this.voice.checked,images:this.images.checked});this.status.textContent='บันทึกสิทธิ์แล้ว';}catch(e){this.status.textContent=e.message;}};actions.append(this.start,stop,save);box.append(actions);
+    const level=el('label','ความปลอดภัย');this.security=el('select');
+    for(const [value,text] of [['lockdown','Lockdown — อ่านหน้าจออย่างเดียว ไม่คลิกไม่พิมพ์'],['guarded','Guarded — ถามก่อนทุกขั้นที่มีผล เช่น ส่ง บันทึก ลบ (แนะนำ)'],['trusted','Trusted — ถามเฉพาะเรื่องเงิน ลบ ติดตั้ง ปิดแอป และปิดเครื่อง'],['blackwall','Blackwall — ไม่ถามเลย ทำทุกขั้นเอง']]){const o=el('option',text);o.value=value;this.security.append(o);}
+    level.append(this.security);box.append(level);
+    box.append(el('p','ส่งเฉพาะข้อมูลของงานนี้ ไม่เก็บภาพลงไฟล์ · ทุกระดับไม่กรอกรหัสผ่านให้ และไม่พิมพ์คำสั่งใน Terminal หรือ PowerShell'));
+    const actions=el('div');actions.className='speech-actions';this.start=el('button','▶ เริ่มทำงาน');this.start.onclick=()=>this.begin();const stop=el('button','■ หยุดงาน');stop.onclick=()=>host.computerStop();const save=el('button','บันทึกสิทธิ์');save.onclick=async()=>{try{await host.computerSave({consent:this.consent.checked,voice:this.voice.checked,images:this.images.checked,security:this.security.value});this.status.textContent='บันทึกสิทธิ์แล้ว';}catch(e){this.status.textContent=e.message;}};actions.append(this.start,stop,save);box.append(actions);
     this.status=el('p','พร้อมรับงาน');this.status.setAttribute('role','status');box.append(this.status);
     this.confirm=el('div');this.confirm.className='speech-actions';this.confirm.hidden=true;
     this.reply=el('input');this.reply.maxLength=1000;this.reply.placeholder='ตอบข้อมูลเพิ่มเติม หรือเข้าสู่ระบบเองแล้วกดยืนยัน';this.reply.setAttribute('aria-label','คำตอบเพิ่มเติม');this.confirm.append(this.reply);
@@ -22,7 +25,7 @@ export class Computer {
     window.addEventListener('beforeunload',()=>host.computerStop());host.onComputerState(state=>this.update(state));
   }
   get open(){return !this.root.hidden;}
-  async load(){const info=await this.host.computerInfo();this.consent.checked=info.settings.consent;this.voice.checked=info.settings.voice;this.images.checked=info.settings.images;this.provider.textContent=`AI ที่ใช้: ${info.provider} — เปลี่ยนได้ในตั้งค่า AI`;return info;}
+  async load(){const info=await this.host.computerInfo();this.consent.checked=info.settings.consent;this.voice.checked=info.settings.voice;this.images.checked=info.settings.images;this.security.value=info.settings.security||'guarded';this.provider.textContent=`AI ที่ใช้: ${info.provider} — เปลี่ยนได้ในตั้งค่า AI`;return info;}
   async show(task){await this.load();if(task)this.task.value=task;this.root.hidden=false;this.onVisibility(true);this.task.focus();}
   hide(){this.root.hidden=true;this.onVisibility(false);}
   async request(task,{voice=false}={}){
@@ -33,7 +36,7 @@ export class Computer {
   }
   async begin({voice=false}={}){try{
     if(!this.task.value.trim()||!this.consent.checked)throw new Error('ระบุงานและอนุญาตอ่านหน้าจอก่อนเริ่ม');
-    await this.host.computerSave({consent:this.consent.checked,voice:this.voice.checked,images:this.images.checked});
+    await this.host.computerSave({consent:this.consent.checked,voice:this.voice.checked,images:this.images.checked,security:this.security.value});
     this.onStart({voice});this.start.disabled=true;
     await this.host.computerStart({task:this.task.value,consent:true,images:this.images.checked,voice});this.hide();
   }catch(e){this.start.disabled=false;this.status.textContent=e.message;this.root.hidden=false;this.onVisibility(true);this.onState?.({status:'error',voice,message:e.message,steps:[]});}}

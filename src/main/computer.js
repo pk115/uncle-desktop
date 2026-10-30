@@ -66,7 +66,19 @@ function actionFrom(text) {
   return a;
 }
 const EFFECT=/ส่ง|โพสต์|เผยแพร่|ลบ|ติดตั้ง|ซื้อ|จ่าย|ชำระ|โอน|บันทึก|ยืนยัน|ตกลง|ถังขยะ|ถอนการติดตั้ง|\b(send|post|publish|delete|remove|install|buy|pay|purchase|checkout|submit|save|confirm|accept|ok|yes|trash|recycle)\b/i;
-function needsConfirmation(a,view) {
+// How much she asks first: lockdown only reads; guarded asks before anything with an effect;
+// trusted only before money, deleting, installing, closing apps and power; blackwall never asks.
+// Every level still refuses password fields and typing into consoles.
+const SECURITY=['lockdown','guarded','trusted','blackwall'];
+const RISKY=/ลบ|ติดตั้ง|ซื้อ|จ่าย|ชำระ|โอน|จอง|ถังขยะ|ถอนการติดตั้ง|\b(delete|remove|install|uninstall|buy|pay|purchase|checkout|order|book|trash)\b/i;
+function needsConfirmation(a,view,security='guarded') {
+  if(security==='blackwall')return false;
+  if(security==='trusted'){
+    if(a.tool==='power')return a.action!=='cancel_shutdown';
+    if(a.tool==='app_window')return a.action==='close';
+    if(['click','double_click','triple_click','middle_click','right_click'].includes(a.tool))return RISKY.test(view.targets?.find(t=>t.id===a.target)?.name||'');
+    return false;
+  }
   if(a.tool==='power')return a.action!=='cancel_shutdown';
   if(a.tool==='app_window')return a.action==='close';
   if(['drag','hold_key'].includes(a.tool))return true;
@@ -136,7 +148,7 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
           if(a.tool==='drag'&&(a.toTarget?!toTarget:!image||!Number.isInteger(a.endX)||!Number.isInteger(a.endY)||a.endX>=image.width||a.endY>=image.height))throw new Error('ปลายทางลากไม่ถูกต้อง');
         }
         if(a.tool==='type'&&/powershell|cmd|terminal|regedit|\brun\b|เรียกใช้|\bconsole\b/i.test(`${view.app.process} ${view.app.title} ${target?.name||''}`))throw new Error('ไม่พิมพ์คำสั่งในคอนโซลหรือ Run');
-        if(needsConfirmation(a,view)){await approve(current,`${a.reason} ใน ${view.app.title} — ยืนยันให้ทำขั้นตอนนี้หรือไม่?`);await native.request({action:'focus',window:view.app.window},signal);}
+        if(needsConfirmation(a,view,current.security)){await approve(current,`${a.reason} ใน ${view.app.title} — ยืนยันให้ทำขั้นตอนนี้หรือไม่?`);await native.request({action:'focus',window:view.app.window},signal);}
         if(signal.aborted||job!==current)return;
         const before=await native.request({action:'read',window:0},signal);
         if(before.app.window!==view.app.window)throw new Error('หน้าต่างเปลี่ยนระหว่างรอ กรุณาเริ่มงานใหม่');
@@ -164,10 +176,10 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
     }catch(e){if(job===current&&!signal.aborted)emit(current,{status:'error',message:e.message});}
     finally{clearTimeout(current.deadline);clearTimeout(current.timer);if(job===current){native.stop();job=null;}}
   }
-  function start({task,consent,images=false,voice=false,directAction=null,readOnly=false}){
-    if(job)throw new Error('มีงานกำลังทำอยู่');if(typeof task!=='string'||!task.trim()||task.length>2000||consent!==true||typeof images!=='boolean'||typeof voice!=='boolean')throw new Error('ระบุงานและอนุญาตอ่านหน้าจอก่อนเริ่ม');
-    const current={task:task.trim(),images,readOnly,directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
+  function start({task,consent,images=false,voice=false,directAction=null,readOnly=false,security='guarded'}){
+    if(job)throw new Error('มีงานกำลังทำอยู่');if(typeof task!=='string'||!task.trim()||task.length>2000||consent!==true||typeof images!=='boolean'||typeof voice!=='boolean'||!SECURITY.includes(security))throw new Error('ระบุงานและอนุญาตอ่านหน้าจอก่อนเริ่ม');
+    const current={task:task.trim(),images,readOnly:readOnly||security==='lockdown',security,directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
   }
   return{start,stop,answer,get busy(){return Boolean(job);}};
 }
-module.exports={createNative,createComputer,actionFrom,needsConfirmation,SHORTCUTS};
+module.exports={createNative,createComputer,actionFrom,needsConfirmation,SHORTCUTS,SECURITY};
