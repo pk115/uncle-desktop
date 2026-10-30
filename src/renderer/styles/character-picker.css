@@ -161,3 +161,21 @@
 @media (max-width: 720px) { .wizard { grid-template-columns: 1fr; } .wizard-steps { border-right: 0; flex-direction: row; overflow-x: auto; } }
 .settings-box .speech-status:empty { display: none; }
 .speech-box .wizard-danger { border: 2px solid var(--red); color: var(--paper); }
+
+/* settings tabs: the wizard first, then each group of her settings (main.js settingsGroups) */
+.settings-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--violet); margin: 0 40px 16px 0; }
+.speech-box .settings-tab { border: 0; border-bottom: 3px solid transparent; background: none; margin: 0; padding: 10px 14px; color: var(--paper-2); font-size: 14px; }
+.speech-box .settings-tab:hover { color: var(--paper); background: var(--ink-2); }
+.speech-box .settings-tab[aria-current] { color: var(--green); border-bottom-color: var(--green); font-weight: 700; }
+.settings-panel { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; }
+.speech-box .settings-panel h1 { margin: 0 0 4px; }
+.settings-card { border: 1px solid var(--violet); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.speech-box .settings-card h2 { margin: 0; }
+.speech-box .settings-switch { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ink-2); cursor: pointer; }
+.speech-box .settings-switch input { appearance: none; width: 38px; height: 20px; flex: none; border: 1px solid var(--violet); background: var(--ink-2); position: relative; cursor: pointer; }
+.speech-box .settings-switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--paper-2); transition: left .15s; }
+.speech-box .settings-switch input:checked { border-color: var(--green); }
+.speech-box .settings-switch input:checked::after { left: 20px; background: var(--green); }
+.speech-box .settings-switch input:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.speech-box .settings-action { align-self: start; }
+.speech-box .settings-note { color: var(--paper-2); }

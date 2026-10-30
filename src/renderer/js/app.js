@@ -780,7 +780,7 @@ async function boot() {
       return;
     }
     if (cmd.name === 'computer') {picker.hide();speechUI.hide();listeningUI.hide();settingsUI.hide();await computerUI.show();return;}
-    if (cmd.name === 'settings') { picker.hide(); speechUI.hide(); listeningUI.hide(); await settingsUI.show(); return; }
+    if (cmd.name === 'settings') { picker.hide(); speechUI.hide(); listeningUI.hide(); await settingsUI.show(cmd.tab); return; }
     const t = brain.t;
     switch (cmd.name) {
       case 'characters':

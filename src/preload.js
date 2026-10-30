@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('host', {
   copyCharacterPrompt: (text) => ipcRenderer.invoke('characters:copyPrompt', text),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
+  menuGroups: () => ipcRenderer.invoke('menu:groups'),
+  menuClick: (id, checked) => ipcRenderer.invoke('menu:click', id, checked),
   listSounds: () => ipcRenderer.invoke('sounds:list'),
   hooksStatus: () => ipcRenderer.invoke('hooks:status'),
   demoWindow: (open) => ipcRenderer.invoke('demo:window', Boolean(open)),

@@ -51,6 +51,8 @@ protocol.registerSchemesAsPrivileged([
 let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
+let settingsGroups = []; // the settings rebuildTray lays out, for her settings dialog's tabs
+let settingsClicks = []; // their handlers, by the id menu:groups gave each
 let demoTimer = null;
 let windowWatch = null;
 // the watcher only speaks when something changes: the overlay asks for this when it (re)loads
@@ -448,35 +450,10 @@ function rebuildTray() {
   };
   const cancelReminder = (id) => updateConfig({ reminders: (config.load().reminders || []).filter((r) => r.id !== id) });
 
-  const menu = Menu.buildFromTemplate([
-    { label: t.online(PORT), enabled: false },
-    { label: t.sync(Math.min(100, Math.floor(xp / 10)), t.stages[stage]), enabled: false },
-    { type: 'separator' },
-    { label: t.teleport, click: () => sendCommand('teleport') },
-    { label: t.satellite, click: () => sendCommand('satellite') },
-    { label: t.demo, click: playDemo },
-    { label: t.help, click: () => sendCommand('welcome') },
-    ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
-    { label: t.talk, click: () => sendCommand('chat') },
-    { label: resolveLang(cfg.lang) === 'th' ? 'ตั้งค่าทั้งหมด…' : 'All settings…', click: () => sendCommand('settings') },
-    { label: resolveLang(cfg.lang) === 'th' ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
-    { label: 'สั่งงานด้วยเสียง / ตั้งคำเรียก…', click: () => sendCommand('listening') },
-    { label: 'ควบคุมเครื่อง / งานหลายขั้นตอน…', click: () => sendCommand('computer') },
-    { label: 'หยุดงานควบคุมเครื่อง (Ctrl+Alt+X)', click: () => computer?.stop() },
-    { label: 'ปิดไมโครโฟนทันที', click: () => { listening?.stop(); sendCommand('listening-stop'); } },
-    { label: t.lookNow, click: () => sendCommand('look') },
-    {
-      label: t.reminders,
-      submenu: reminders.length
-        ? reminders.map((r) => ({
-          label: `${when(r.at)} · ${(r.text || '…').slice(0, 50)}`,
-          submenu: [{ label: t.cancelReminder, click: () => cancelReminder(r.id) }],
-        }))
-        : [{ label: t.noReminders, enabled: false }],
-    },
-    { label: t.custom, click: () => sendCommand('customize') },
-    { label: t.character + '…', click: () => sendCommand('characters') },
-    {
+  const th = resolveLang(cfg.lang) === 'th';
+  const item = {
+    character: { label: t.character + '…', click: () => sendCommand('characters') },
+    quick: {
       label: t.character + (resolveLang(cfg.lang) === 'th' ? ' (เปลี่ยนด่วน)' : ' (quick switch)'),
       submenu: CHARACTERS.map((character) => ({
         label: resolveLang(cfg.lang) === 'th' ? character.nameTh : character.name,
@@ -484,15 +461,15 @@ function rebuildTray() {
         click: () => updateConfig({ characterId: character.id }),
       })),
     },
-    { label: cfg.visible ? t.hide : t.show, accelerator: hotkeys().toggle || undefined, click: () => toggleVisible() },
-    { type: 'separator' },
-    {
+    visible: { label: cfg.visible ? t.hide : t.show, accelerator: hotkeys().toggle || undefined, click: () => toggleVisible() },
+    custom: { label: t.custom, click: () => sendCommand('customize') },
+    size: {
       label: t.size,
       submenu: [[t.small, 0.45], [t.medium, 0.6], [t.large, 0.8], ['XL · 120%', 1.2], ['XXL · 160%', 1.6]].map(([label, scale]) => ({
         label, type: 'radio', checked: Math.abs(cfg.scale - scale) < 0.01, click: () => updateConfig({ scale }),
       })),
     },
-    {
+    view: {
       label: resolveLang(cfg.lang) === 'th' ? 'มุมมองตัวละคร' : 'Character view',
       submenu: [['full', 'เต็มตัว', 'Full body'], ['bust', 'ครึ่งตัว · เห็นหน้าชัด', 'Upper body']].map(([view, th, en]) => ({
         label: resolveLang(cfg.lang) === 'th' ? th : en, type: 'radio', checked: (cfg.characterFraming || 'full') === view,
@@ -500,7 +477,7 @@ function rebuildTray() {
         click: () => updateConfig({ characterFraming: view }),
       })),
     },
-    {
+    sound: {
       label: t.sound,
       submenu: [
         { label: t.mute, type: 'checkbox', checked: cfg.muted, click: (item) => updateConfig({ muted: item.checked }) },
@@ -514,7 +491,7 @@ function rebuildTray() {
         },
       ],
     },
-    {
+    screen: {
       label: t.screen,
       enabled: screens.length > 1,
       submenu: [
@@ -528,16 +505,18 @@ function rebuildTray() {
         { label: t.follow, type: 'checkbox', checked: cfg.follow !== false, click: (item) => updateConfig({ follow: item.checked }) },
       ],
     },
-    {
+    chat: {
       label: t.chatModel,
       submenu: [
         { label: t.aiSetup, click: () => sendCommand('setupChat') },
         { type: 'separator' },
+        { label: th ? 'ผู้ให้บริการ AI' : 'Chat provider', enabled: false },
         ...Object.entries(llm.PROVIDERS).map(([provider, p]) => ({
           label: resolveLang(cfg.lang) === 'th' ? p.label.replace('(local)', '(ในเครื่อง)').replace('(local :8080)', '(ในเครื่อง :8080)').replace('(no key)', '(ไม่ต้องใช้คีย์)').replace('Custom (customUrl in config)', 'กำหนดเอง (ตั้งค่า customUrl)').replace('(sends to the terminal agent)', '(ส่งให้ agent ในเทอร์มินัล)') : p.label,
           type: 'radio', checked: cfg.provider === provider, click: () => pickProvider(provider),
         })),
         { type: 'separator' },
+        { label: th ? 'โมเดล' : 'Model', enabled: false },
         ...(chatModels?.length
           ? chatModels.map((name) => ({
             label: cloud.free.includes(name) ? `${name} · ${t.cloudFree}` : name,
@@ -566,11 +545,11 @@ function rebuildTray() {
         { label: t.apiKey, click: () => sendCommand('setupKey') },
       ],
     },
-    { label: t.wander, type: 'checkbox', checked: cfg.wander, click: (item) => updateConfig({ wander: item.checked }) },
-    { label: t.possess, type: 'checkbox', checked: cfg.possess, click: (item) => updateConfig({ possess: item.checked }) },
-    { label: t.jealous, type: 'checkbox', checked: cfg.jealous !== false, click: (item) => updateConfig({ jealous: item.checked }) },
-    { label: t.pcReact, type: 'checkbox', checked: cfg.pcReact !== false, click: (item) => updateConfig({ pcReact: item.checked }) },
-    {
+    wander: { label: t.wander, type: 'checkbox', checked: cfg.wander, click: (item) => updateConfig({ wander: item.checked }) },
+    possess: { label: t.possess, type: 'checkbox', checked: cfg.possess, click: (item) => updateConfig({ possess: item.checked }) },
+    jealous: { label: t.jealous, type: 'checkbox', checked: cfg.jealous !== false, click: (item) => updateConfig({ jealous: item.checked }) },
+    pcReact: { label: t.pcReact, type: 'checkbox', checked: cfg.pcReact !== false, click: (item) => updateConfig({ pcReact: item.checked }) },
+    lookAuto: {
       // she asks first (what she'll send where), then turns it on herself
       label: t.lookAuto, type: 'checkbox', checked: Boolean(cfg.watchScreen),
       click: (item) => {
@@ -578,14 +557,13 @@ function rebuildTray() {
         rebuildTray(); // as it is until she's asked
       },
     },
-    {
+    rest: {
       label: t.rest,
       submenu: [['corner', t.restCorner], ['taskbar', t.restTaskbar]].map(([rest, label]) => ({
         label, type: 'radio', checked: cfg.rest === rest, click: () => updateConfig({ rest }),
       })),
     },
-    // the coding assistant she watches (a new one: she says hello and offers to plug herself in), or none
-    {
+    watch: {
       label: t.watch,
       submenu: [
         ...Object.entries(ASSISTANTS).map(([id, { name }]) => ({
@@ -601,13 +579,13 @@ function rebuildTray() {
         { label: t.watchNone, type: 'radio', checked: !cfg.claude, click: () => updateConfig({ claude: false }) },
       ],
     },
-    {
+    motion: {
       label: t.motion,
       submenu: [['auto', t.motionAuto], ['full', t.motionFull], ['reduced', t.motionReduced]].map(([motion, label]) => ({
         label, type: 'radio', checked: cfg.motion === motion, click: () => updateConfig({ motion, motionAsked: true }),
       })),
     },
-    {
+    display: {
       label: t.display,
       // only read when she starts: she restarts in the mode picked
       submenu: [['auto', t.displayAuto], ['gl', t.displayGl], ['software', t.displaySoftware]].map(([render, label]) => ({
@@ -620,27 +598,71 @@ function rebuildTray() {
         },
       })),
     },
-    {
+    lang: {
       label: t.lang,
       submenu: [[t.auto, 'auto'], ...LANGS.map((lang) => [TRAY[lang].name, lang])].map(([label, lang]) => ({
         label, type: 'radio', checked: cfg.lang === lang, click: () => updateConfig({ lang }),
       })),
     },
-    {
+    startup: {
       label: t.startup,
       type: 'checkbox',
       checked: app.getLoginItemSettings(loginItemOptions()).openAtLogin,
       click: (item) => app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: item.checked }),
     },
-    // her hooks, while she watches Claude Code
-    ...(cfg.claude ? [
-      { type: 'separator' },
-      hookState.installed
-        ? { label: t.hooksOn, enabled: false }
-        : { label: t.hooksOff, click: () => runHooks('install') },
-      ...(hookState.installed ? [{ label: t.hooksRemove, click: () => runHooks('uninstall') }] : []),
-    ] : []),
+  };
+  // every setting, as the tabs of her settings dialog (settings.js renders them, menu:click runs them)
+  settingsGroups = [
+    { id: 'appearance', title: th ? 'ตัวละคร' : 'Character', items: [item.character, item.quick, item.size, item.view, item.visible, item.custom] },
+    { id: 'chat', title: th ? 'AI แชต' : 'Chat AI', items: item.chat.submenu },
+    { id: 'voice', title: th ? 'เสียงและไมค์' : 'Voice', items: [
+      { label: th ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
+      { label: th ? 'ไมค์ คำเรียก และ ElevenLabs…' : 'Mic, wake phrase and ElevenLabs…', click: () => sendCommand('listening') },
+      ...item.sound.submenu,
+    ] },
+    { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
+    { id: 'agents', title: 'Coding AI', items: [
+      item.watch,
+      ...(cfg.claude ? [
+        { type: 'separator' },
+        hookState.installed
+          ? { label: t.hooksOn, enabled: false }
+          : { label: t.hooksOff, click: () => runHooks('install') },
+        ...(hookState.installed ? [{ label: t.hooksRemove, click: () => runHooks('uninstall') }] : []),
+      ] : []),
+      { label: th ? 'ควบคุมเครื่อง / งานหลายขั้นตอน…' : 'Computer control…', click: () => sendCommand('computer') },
+      ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
+    ] },
+    { id: 'system', title: th ? 'ระบบ' : 'System', items: [item.lang, item.startup, item.display, { type: 'separator' },
+      { label: t.teleport, click: () => sendCommand('teleport') },
+      { label: t.satellite, click: () => sendCommand('satellite') },
+      { label: t.demo, click: playDemo },
+      { label: t.help, click: () => sendCommand('welcome') },
+    ] },
+  ];
+
+  // her right-click and tray menu: what you reach for every day; the rest is under Settings…
+  const menu = Menu.buildFromTemplate([
+    { label: t.sync(Math.min(100, Math.floor(xp / 10)), t.stages[stage]), enabled: false },
     { type: 'separator' },
+    { label: t.talk, click: () => sendCommand('chat') },
+    { label: th ? 'เริ่มพูด / ปิดไมค์' : 'Talk / stop mic', accelerator: hotkeys().voice || undefined, click: () => sendCommand('listening-toggle') },
+    { label: t.lookNow, click: () => sendCommand('look') },
+    item.quick,
+    { label: t.mute, type: 'checkbox', checked: cfg.muted, click: (it) => updateConfig({ muted: it.checked }) },
+    item.visible,
+    ...(computer?.busy ? [{ label: th ? 'หยุดงานควบคุมเครื่อง' : 'Stop computer job', accelerator: hotkeys().stopJob || undefined, click: () => computer?.stop() }] : []),
+    ...(reminders.length ? [{
+        label: t.reminders,
+        submenu: reminders.length
+          ? reminders.map((r) => ({
+            label: `${when(r.at)} · ${(r.text || '…').slice(0, 50)}`,
+            submenu: [{ label: t.cancelReminder, click: () => cancelReminder(r.id) }],
+          }))
+          : [{ label: t.noReminders, enabled: false }],
+      }] : []),
+    { type: 'separator' },
+    { label: th ? 'ตั้งค่า…' : 'Settings…', click: () => sendCommand('settings', { tab: 'start' }) },
     { label: t.quit, click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);
@@ -986,6 +1008,20 @@ function registerIpc() {
   ipcMain.handle('demo:window', (_e, open) => demoWindow(open));
   // right-clicking her: the same menu as the tray icon (which Windows often hides behind the ^ by the clock)
   ipcMain.on('menu:open', () => trayMenu?.popup({ window: overlay }));
+  // her settings dialog's tabs: the menu items as plain data, each click by id
+  ipcMain.handle('menu:groups', () => {
+    rebuildTray();
+    settingsClicks = [];
+    const plain = (it) => ({
+      label: it.label, type: it.type || (it.submenu ? 'submenu' : 'normal'), checked: Boolean(it.checked), enabled: it.enabled !== false,
+      ...(it.click && { id: settingsClicks.push(it.click) - 1 }), ...(it.submenu && { submenu: it.submenu.map(plain) }),
+    });
+    return settingsGroups.map((g) => ({ id: g.id, title: g.title, items: g.items.map(plain) }));
+  });
+  ipcMain.handle('menu:click', (_e, id, checked) => {
+    if (!Number.isInteger(id) || !settingsClicks[id]) throw new Error('ตัวเลือกนี้เปลี่ยนไปแล้ว ลองเปิดแท็บใหม่');
+    return settingsClicks[id]({ checked: Boolean(checked) });
+  });
   // her welcome panel's buttons
   ipcMain.handle('hooks:install', () => runHooks('install', { quiet: true }));
   ipcMain.handle('claude:found', () => fs.existsSync(path.dirname(activeHooks().status().file))); // Claude Code keeps its settings there

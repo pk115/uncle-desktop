@@ -41,8 +41,10 @@ export class Settings {
     this.nav = el('nav', '', 'wizard-steps'); this.nav.setAttribute('aria-label', 'ขั้นตอนตั้งค่า');
     this.body = el('div', '', 'wizard-body');
     this.status = el('p', '', 'speech-status'); this.status.setAttribute('role', 'status');
-    const layout = el('div', '', 'wizard'); layout.append(this.nav, this.body);
-    box.append(close, layout, this.status);
+    this.layout = el('div', '', 'wizard'); this.layout.append(this.nav, this.body);
+    this.tabs = el('nav', '', 'settings-tabs'); this.tabs.setAttribute('aria-label', 'หมวดการตั้งค่า');
+    this.panel = el('div', '', 'settings-panel');
+    box.append(close, this.tabs, this.layout, this.panel, this.status);
     root.replaceChildren(box);
     host.onListeningProgress?.((text) => { if (this.progress) this.progress.textContent = text; });
 
@@ -59,11 +61,71 @@ export class Settings {
   }
   get open() { return !this.root.hidden; }
 
-  // step: an id from STEPS or 'more'; none opens the first required step not done yet
+  // step: a wizard step id, or a tab ('appearance', 'chat', 'voice', 'behavior', 'agents', 'system');
+  // none or 'start' opens the wizard at the first required step not done yet
   async show(step) {
     this.root.hidden = false; this.status.textContent = ''; this.onVisibility(true);
     await this.check();
-    this.go(step === 'more' ? 'more' : step ? STEPS.findIndex(([id]) => id === step) : firstOpenStep(this.done));
+    const index = STEPS.findIndex(([id]) => id === step);
+    if (step && step !== 'start' && index < 0) return this.tab(step);
+    this.tab('start');
+    this.go(index < 0 ? firstOpenStep(this.done) : index);
+  }
+
+  // the tab bar; 'start' is the wizard, the others are her settings (main.js settingsGroups)
+  async tab(id) {
+    this.groups = await this.host.menuGroups();
+    const tabs = [['start', 'เริ่มต้นใช้งาน'], ...this.groups.map((g) => [g.id, g.title])];
+    this.tabs.replaceChildren(...tabs.map(([tab, title]) => {
+      const b = button(title, () => (tab === 'start' ? this.show('start') : this.tab(tab)), 'settings-tab');
+      if (tab === id) b.setAttribute('aria-current', 'page');
+      return b;
+    }));
+    this.layout.hidden = id !== 'start'; this.panel.hidden = id === 'start';
+    if (id === 'start') return;
+    this.current = id; this.status.textContent = '';
+    const group = this.groups.find((g) => g.id === id) || this.groups[0];
+    const h = el('h1', group.title); h.id = 'settings-title';
+    this.panel.replaceChildren(h);
+    this.items(group.items, this.panel);
+    if (id === 'system') this.more();
+    this.tabs.querySelector('[aria-current]')?.focus();
+  }
+
+  // menu items as controls: a checkbox is a switch, a set of radios a dropdown, an action a button
+  items(list, parent, caption = '') {
+    const click = async (id, checked) => {
+      try { await this.host.menuClick(id, checked); setTimeout(() => this.open && this.current && this.tab(this.current), 250); }
+      catch (e) { this.error(e); }
+    };
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      if (it.type === 'radio') {
+        const run = []; while (list[i]?.type === 'radio') run.push(list[i++]); i--;
+        const select = el('select'); select.id = `settings-${run[0].id}`;
+        for (const r of run) { const o = el('option', r.label); o.value = r.id; o.selected = r.checked; o.disabled = !r.enabled; select.append(o); }
+        select.onchange = () => click(Number(select.value), true);
+        parent.append(label(caption || 'เลือก', select), select);
+        caption = '';
+      } else if (it.type === 'checkbox') {
+        const input = el('input'); input.type = 'checkbox'; input.id = `settings-${it.id}`; input.checked = it.checked; input.disabled = !it.enabled;
+        input.onchange = () => click(it.id, input.checked);
+        const row = el('label', '', 'settings-switch'); row.htmlFor = input.id; row.append(input, el('span', it.label));
+        parent.append(row);
+      } else if (it.type === 'submenu') {
+        const allRadio = it.submenu.filter((c) => c.type !== 'separator').every((c) => c.type === 'radio');
+        if (allRadio) this.items(it.submenu.filter((c) => c.type !== 'separator'), parent, it.label);
+        else { const card = el('section', '', 'settings-card'); card.append(el('h2', it.label)); this.items(it.submenu, card, it.label); parent.append(card); }
+      } else if (it.type === 'separator') {
+        caption = '';
+      } else if (it.id !== undefined && it.enabled) {
+        parent.append(button(it.label, () => { if (it.label.endsWith('…')) this.hide(); click(it.id); }, 'settings-action'));
+      } else if (it.label && list[i + 1]?.type === 'radio') {
+        caption = it.label; // a heading for the dropdown below it
+      } else if (it.label) {
+        parent.append(el('p', it.label, 'settings-note'));
+      }
+    }
   }
   hide() { if (this.root.hidden) return; this.root.hidden = true; this.onVisibility(false); }
 
@@ -84,16 +146,15 @@ export class Settings {
       if (i === index) item.setAttribute('aria-current', 'step');
       if (this.done[id]) item.classList.add('is-done');
       return item;
-    }), button('ตั้งค่าเพิ่มเติม', () => this.go('more'), 'wizard-step wizard-step--more'));
-    if (index === 'more') this.nav.lastChild.setAttribute('aria-current', 'page');
-    const id = index === 'more' ? 'more' : STEPS[index][0];
+    }));
+    const id = STEPS[index][0];
     this.body.replaceChildren();
     this[id]();
     this.body.querySelector('button,input,select')?.focus();
   }
 
   page(title, hint) {
-    if (this.step !== 'more') this.body.append(el('p', `ขั้นที่ ${this.step + 1} จาก ${STEPS.length}`, 'wizard-count'));
+    this.body.append(el('p', `ขั้นที่ ${this.step + 1} จาก ${STEPS.length}`, 'wizard-count'));
     const h = el('h1', title); h.id = 'settings-title';
     this.body.append(h, el('p', hint));
   }
@@ -221,9 +282,9 @@ export class Settings {
   }
 
   // shortcuts, her personality and memory, and the panels that aren't a first-run step
+  // the System tab's own part: shortcuts, her personality and memory, and reset
   more() {
-    const h = el('h1', 'ตั้งค่าเพิ่มเติม'); h.id = 'settings-title';
-    this.body.append(h, el('h2', 'คีย์ลัด'), el('p', 'คลิกช่องแล้วกดปุ่มที่ต้องการ ต้องมี Ctrl, Alt, Shift หรือ Win ร่วมด้วย · Backspace เพื่อปิดคีย์ลัดนั้น'));
+    this.panel.append(el('h2', 'คีย์ลัด'), el('p', 'คลิกช่องแล้วกดปุ่มที่ต้องการ ต้องมี Ctrl, Alt, Shift หรือ Win ร่วมด้วย · Backspace เพื่อปิดคีย์ลัดนั้น'));
     const hotkeys = this.cfg.hotkeys || {};
     this.keys = {};
     for (const [id, label] of HOTKEYS) {
@@ -237,33 +298,33 @@ export class Settings {
         input.value = shown(input.dataset.keys);
       };
       this.keys[id] = input;
-      this.body.append(caption, input);
+      this.panel.append(caption, input);
     }
     const keyActions = el('div', '', 'speech-actions');
     keyActions.append(button('บันทึกคีย์ลัด', () => this.saveKeys()), button('คืนค่าเริ่มต้น', () => this.saveKeys({ stopJob: 'Control+Alt+X', toggle: 'Control+Alt+C', voice: 'Control+Alt+V', mute: 'Control+Alt+M' })));
-    this.body.append(keyActions);
+    this.panel.append(keyActions);
 
-    this.body.append(el('h2', 'บุคลิกและความจำระยะยาว'), el('p', 'สองไฟล์นี้ส่งให้ AI ทุกครั้งที่คุย เปิดแก้ใน Notepad บันทึกแล้วมีผลตอนเปิดแชตครั้งถัดไป'));
+    this.panel.append(el('h2', 'บุคลิกและความจำระยะยาว'), el('p', 'สองไฟล์นี้ส่งให้ AI ทุกครั้งที่คุย เปิดแก้ใน Notepad บันทึกแล้วมีผลตอนเปิดแชตครั้งถัดไป'));
     const notes = el('div', '', 'wizard-row');
     notes.append(button('แก้ไข personality.md', () => this.openNotes('personality')), button('แก้ไข me.md', () => this.openNotes('me')));
     const learn = el('input'); learn.type = 'checkbox'; learn.id = 'settings-learn'; learn.checked = this.cfg.learn !== false;
     learn.onchange = () => this.host.setConfig({ learn: learn.checked });
     const learnLabel = el('label'); learnLabel.htmlFor = learn.id;
     learnLabel.append(learn, document.createTextNode(' ให้จดสิ่งที่เรียนรู้ลง me.md เองทุก 5 รอบที่คุย (ใช้ AI ตัวเดียวกับแชต ไม่ทำกับ Claude Code)'));
-    this.body.append(notes, learnLabel);
+    this.panel.append(notes, learnLabel);
 
-    this.body.append(el('h2', 'ความสามารถอื่น'));
+    this.panel.append(el('h2', 'ความสามารถอื่น'));
     const more = el('div', '', 'wizard-row');
     more.append(button('ควบคุมเครื่อง…', () => { this.hide(); this.onOpen('computer'); }), button('ชื่อเล่นและความจำสั้น…', () => { this.hide(); this.onOpen('customize'); }));
-    this.body.append(more);
+    this.panel.append(more);
 
-    this.body.append(el('h2', 'ล้างการตั้งค่าทั้งหมด'), el('p', 'คืนทุกอย่างเป็นค่าเริ่มต้นและลบ API key ที่บันทึกไว้ แล้วเริ่มตั้งค่าทีละขั้นใหม่ ไม่ลบโมเดลเสียงที่ดาวน์โหลดแล้ว ตัวละครที่นำเข้า ประวัติสนทนา และไฟล์ personality.md / me.md'));
+    this.panel.append(el('h2', 'ล้างการตั้งค่าทั้งหมด'), el('p', 'คืนทุกอย่างเป็นค่าเริ่มต้นและลบ API key ที่บันทึกไว้ แล้วเริ่มตั้งค่าทีละขั้นใหม่ ไม่ลบโมเดลเสียงที่ดาวน์โหลดแล้ว ตัวละครที่นำเข้า ประวัติสนทนา และไฟล์ personality.md / me.md'));
     const reset = button('ล้างการตั้งค่าทั้งหมด…', () => {
       if (reset.dataset.armed) return this.host.resetConfig().catch((e) => this.error(e));
       reset.dataset.armed = '1'; reset.textContent = 'กดอีกครั้งเพื่อยืนยันการล้าง'; reset.classList.add('wizard-danger');
       this.status.textContent = 'ยังไม่ได้ล้าง — กดปุ่มเดิมอีกครั้งเพื่อยืนยัน หรือปิดหน้านี้เพื่อยกเลิก';
     });
-    this.body.append(reset);
+    this.panel.append(reset);
   }
 
   async saveKeys(keys = Object.fromEntries(HOTKEYS.map(([id]) => [id, this.keys[id].dataset.keys]))) {
