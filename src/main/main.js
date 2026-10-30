@@ -873,6 +873,17 @@ function runHooks(action, { quiet = false } = {}) {
 
 // The model she talks with: the one picked in her menu if it's still installed, else the first one
 // on this PC (a cloud model only once you pick it).
+// a tool that writes, asked in her bubble: your yes or no (no answer in 2 minutes is no)
+function askInBubble(tool, args) {
+  return new Promise((resolve) => {
+    const ask = randomUUID();
+    mcpAsks.set(ask, resolve);
+    const detail = Object.entries(args).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ').slice(0, 240);
+    sendCommand('mcp-confirm', { id: ask, tool: `${tool.server}/${tool.name}`, detail });
+    setTimeout(() => { if (mcpAsks.delete(ask)) resolve(false); }, 120000).unref?.();
+  });
+}
+
 // her answer to your phone: her persona, your notes, her tools; a picture goes to the vision model
 async function phoneAnswer({ history, text, images, confirm }) {
   const cfg = config.load();
@@ -1219,6 +1230,8 @@ function registerIpc() {
   ipcMain.on('agent:stop',()=>{voiceAgentAPI.stop();voiceAgentSession=null;computer?.stop();});
   ipcMain.handle('agent:tool',(_e,{sessionId,name,args}={})=>{
     if(!voiceAgentSession||sessionId!==voiceAgentSession||voiceAgent.settings(config.load().voiceAgent).engine!=='elevenlabs'||!voiceAgent.settings(config.load().voiceAgent).consent)throw Error('การสนทนานี้จบแล้ว');
+    // mail, calendar, news, MCP: her assistant answers in words (writes still ask in her bubble)
+    if(name==='ask_assistant')return phoneAnswer({history:[],text:String(args?.question||'').slice(0,2000),images:[],confirm:askInBubble});
     if(computer.busy)throw Error('มีงานกำลังทำอยู่ รอผลหรือหยุดก่อน');
     if(!computerOptions().consent||!computerOptions().voice)throw Error('ยังไม่ได้ทำ: เปิดควบคุมเครื่อง อนุญาตอ่านหน้าต่างและเริ่มงานด้วยเสียง แล้วบันทึกสิทธิ์ก่อน');
     const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=modelFor('computer',computerConfig);
@@ -1378,14 +1391,7 @@ function registerIpc() {
         tools, messages, send, chat: withTools,
         mayWrite: computerOptions().switches.send,
         call: (server, name, args) => callTool(server, name, args, { signal: abort.signal }),
-        confirm: (tool, args) => new Promise((resolve) => {
-          const ask = randomUUID();
-          mcpAsks.set(ask, resolve);
-          const detail = Object.entries(args).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ').slice(0, 240);
-          sendCommand('mcp-confirm', { id: ask, tool: `${tool.server}/${tool.name}`, detail });
-          setTimeout(() => { if (mcpAsks.delete(ask)) resolve(false); }, 120000);
-          abort.signal.addEventListener('abort', () => { if (mcpAsks.delete(ask)) resolve(false); }, { once: true });
-        }),
+        confirm: askInBubble,
       }) : await plain(messages, send);
       if (cfg.provider === 'claude' && cfg.characterId === config.load().characterId && !abort.signal.aborted) saveMemory({ claude: llm.claudeMemory() });
       return { ok: true, text };

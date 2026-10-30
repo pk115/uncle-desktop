@@ -23,6 +23,7 @@ const TOOLS=[
  spec('power','Request a Windows power action. Local confirmation is required.',{action:choice('Action',['shut_down','restart','sleep','lock','sign_out','cancel'])},['action']),
  spec('nap','Sleep or wake the companion, not the PC.',{action:choice('Action',['sleep','wake'])},['action']),
  spec('move_yourself','Move the companion using supported poses and next monitor.',{action:choice('Action',['come_here','other_screen','sit','stand_up','hang','ride_cursor','hop_off','hide','show'])},['action']),
+ spec('ask_assistant','Mail, calendar, news, tasks and any connected service: hand the whole request to the assistant, which uses the right tools and answers in words. Anything that sends or changes data still asks the user first.',{question:str('The complete user request')},['question']),
  spec('animate','Play a companion animation.',{name:choice('Animation',['idle','glitch','grin','blink','dance','stop_dancing'])},['name'])
 ];
 function validateTool(name,args){
@@ -34,6 +35,7 @@ function validateTool(name,args){
 function toolAction(name,args){
  const a=validateTool(name,args),reason='คำสั่งจาก ElevenLabs';let result;
  if(name==='use_computer')return {task:a.task};
+ if(name==='ask_assistant')return {task:a.question,assistant:true};
  if(name==='look_at_screen')return {readOnly:true,task:'อ่านหน้าต่างปัจจุบันเท่านั้น ห้ามคลิกหรือพิมพ์ อธิบายสิ่งที่เห็นตามคำถาม: '+(a.focus||'ตอนนี้หน้าจอแสดงอะไร')};
  if(name==='open_app')result={tool:name,name:a.name};
  else if(name==='open_website'){if(/^[a-z][a-z0-9+.-]*:/i.test(a.site)&&!/^https?:\/\//i.test(a.site))throw Error('รองรับเว็บ HTTP/HTTPS เท่านั้น');result={tool:name,url:/^https?:\/\//i.test(a.site)?a.site:'https://'+a.site,search:a.search};}
