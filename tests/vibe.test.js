@@ -7,6 +7,9 @@ const { EventEmitter } = require('node:events');
 const { spawn } = require('node:child_process');
 const { createVibe, progressLine } = require('../src/main/vibe');
 
+// commits in the tests need a name, CI has none
+Object.assign(process.env, { GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' });
+
 test('vibe: progress lines from Claude Code and Codex events', () => {
   assert.equal(progressLine({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Edit', input: { file_path: 'src/app.js' } }] } }), '🔧 Edit: src/app.js');
   assert.equal(progressLine({ type: 'item.completed', item: { type: 'command_execution', command: 'npm test' } }), '🔧 run: npm test');
