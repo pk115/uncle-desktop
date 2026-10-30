@@ -763,6 +763,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'computer-cursor') { // her own cursor glides there just before she clicks
+      let c = document.getElementById('her-cursor');
+      if (!c) { c = document.createElement('div'); c.id = 'her-cursor'; c.setAttribute('aria-hidden', 'true'); document.body.append(c); }
+      c.style.left = `${cmd.x}px`; c.style.top = `${cmd.y}px`; c.classList.add('is-on');
+      clearTimeout(c.timer); c.timer = setTimeout(() => c.classList.remove('is-on'), 2500);
+      return;
+    }
     if(cmd.name==='computer-companion'){
       const action=cmd.action;
       if(action==='sleep')capri.setMode('sleep');

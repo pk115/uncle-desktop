@@ -872,6 +872,8 @@ function registerIpc() {
   });
   computer = createComputer({ native: computerNative,system:systemTools,
     notify: state => overlay?.webContents.send('computer:state', state),
+    // her cursor: screen pixels (Windows) or points (Mac) into the overlay's own coordinates
+    onPoint: (at) => { if (!overlay) return; const p = process.platform === 'win32' ? screen.screenToDipPoint(at) : at, b = overlay.getBounds(); sendCommand('computer-cursor', { x: p.x - b.x, y: p.y - b.y }); },
     picture: (view, signal) => computerNative.request({action:'picture',window:view.app.window},signal),
     openApp: async (name, signal) => {
       if(signal.aborted) throw new Error('หยุดแล้ว');
