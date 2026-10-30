@@ -559,6 +559,12 @@ function rebuildTray() {
           }),
           { type: 'separator' },
         ] : []),
+        // a model per kind of work
+        ...(chatModels?.length > 1 ? [{ label: th ? 'โมเดลตามงาน' : 'Models by task', submenu: Object.entries(TASKS).map(([task, [thName, enName]]) => ({
+          label: `${th ? thName : enName}: ${cfg.taskModels?.[task] && chatModels.includes(cfg.taskModels[task]) ? cfg.taskModels[task] : (th ? 'เหมือนแชต' : 'same as chat')}`,
+          submenu: [{ label: th ? 'เหมือนแชต' : 'Same as chat', type: 'radio', checked: !chatModels.includes(cfg.taskModels?.[task]), click: () => updateConfig({ taskModels: { ...cfg.taskModels, [task]: '' } }) },
+            ...chatModels.map((name) => ({ label: name, type: 'radio', checked: cfg.taskModels?.[task] === name, click: () => updateConfig({ taskModels: { ...cfg.taskModels, [task]: name } }) }))],
+        })) }, { type: 'separator' }] : []),
         { label: th ? 'โมเดล' : 'Model', enabled: false },
         ...(chatModels?.length
           ? chatModels.map((name) => ({
@@ -787,6 +793,14 @@ async function connectAssistant(kind) {
   rebuildTray();
 }
 
+// A model per kind of work (her AI menu › models by task): tools (mail, calendar, MCP), computer
+// control, background jobs (news, briefs), vision. Unset or gone from the list: the chat's own.
+const TASKS = { tools: ['ใช้เครื่องมือ (เมล ปฏิทิน MCP)', 'Tools (mail, calendar, MCP)'], computer: ['ควบคุมเครื่อง', 'Computer control'], background: ['งานเบื้องหลัง (ข่าว สรุป)', 'Background jobs (news, briefs)'], vision: ['ดูภาพ', 'Vision'] };
+function modelFor(task, cfg = config.load()) {
+  const chosen = cfg.taskModels?.[task];
+  return chosen && chatModels?.includes(chosen) ? chosen : pickModel(cfg);
+}
+
 function pickModel(cfg = config.load()) {
   if (!chatModels?.length) return null;
   if (chatModels.includes(cfg.chatModel)) return cfg.chatModel;
@@ -893,7 +907,7 @@ async function sayAboutSnap({ id, persona, prompt, history = [] }) {
   if (!image) return { ok: false, error: 'the picture is gone' };
   const cfg = config.load();
   if (!chatModels?.length) await refreshModels();
-  const model = pickModel(cfg);
+  const model = modelFor('vision', cfg);
   if (!model) return { ok: false, code: 'noai' };
   if (cfg.provider === 'claude') return { ok: false, code: 'novision', model: 'Claude Code' };
   if (cfg.provider === 'ollama' && !(await ollama.canSee(model))) return { ok: false, code: 'novision', model };
@@ -988,7 +1002,7 @@ function registerIpc() {
   ipcMain.handle('computer:start' , (_e, request) => {
     if(computer.busy)throw new Error('มีงานกำลังทำอยู่');
     if(request?.voice&&(!computerOptions().consent||!computerOptions().voice))throw new Error('กรุณาอนุญาตเริ่มงานด้วยเสียงก่อน');
-    computerConfig=llmConfig();computerModel=pickModel(computerConfig);
+    computerConfig=llmConfig();computerModel=modelFor('computer',computerConfig);
     if(!computerModel)throw new Error('กรุณาตั้งค่า AI และเลือกโมเดลก่อนเริ่ม');
     const {task,consent,images,voice}=request||{};return computer.start({task,consent,images,voice,security:computerOptions().security,switches:computerOptions().switches});
   });
@@ -1013,7 +1027,7 @@ function registerIpc() {
     if(!voiceAgentSession||sessionId!==voiceAgentSession||voiceAgent.settings(config.load().voiceAgent).engine!=='elevenlabs'||!voiceAgent.settings(config.load().voiceAgent).consent)throw Error('การสนทนานี้จบแล้ว');
     if(computer.busy)throw Error('มีงานกำลังทำอยู่ รอผลหรือหยุดก่อน');
     if(!computerOptions().consent||!computerOptions().voice)throw Error('ยังไม่ได้ทำ: เปิดควบคุมเครื่อง อนุญาตอ่านหน้าต่างและเริ่มงานด้วยเสียง แล้วบันทึกสิทธิ์ก่อน');
-    const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=pickModel(computerConfig);
+    const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=modelFor('computer',computerConfig);
     if(!plan.action&&!computerModel)throw Error('ตั้งค่า AI สำหรับวางแผนควบคุมเครื่องก่อน');
     const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly,security:computerOptions().security,switches:computerOptions().switches});
     return JSON.stringify({status:'accepted',jobId:id,message:'เริ่มรับงานแล้ว ยังไม่ใช่ผลสำเร็จ รอคำถามหรือผลตรวจจากระบบงาน'});
@@ -1163,10 +1177,11 @@ function registerIpc() {
       };
       const cfg = config.load();
       const plain = (msgs, s) => chatWithFallback(cfg, msgs, s, abort.signal, () => streamed);
+      const withTools = (msgs, s) => chatWithFallback({ ...cfg, chatModel: modelFor('tools', cfg) }, msgs, s, abort.signal, () => streamed);
       // her MCP tools (mail, calendar…): offered to the AI; one that writes asks you first
       const tools = cfg.provider === 'claude' ? [] : mcp?.tools() || [];
       const text = tools.length ? await chatWithTools({
-        tools, messages, send, chat: plain,
+        tools, messages, send, chat: withTools,
         mayWrite: computerOptions().switches.send,
         call: (server, name, args) => mcp.call(server, name, args, { signal: abort.signal }),
         confirm: (tool, args) => new Promise((resolve) => {
