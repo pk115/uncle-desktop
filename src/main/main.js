@@ -18,6 +18,7 @@ const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES } = require('./s
 const speech = createSpeech({ script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
 const { createListening, listeningSettings } = require('./listening');
 const { createNative, createComputer, SECURITY } = require('./computer');
+const { TIERS, tierModel } = require('./tiers');
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
 let voiceAgentAPI, voiceAgentSession=null;
@@ -530,6 +531,16 @@ function rebuildTray() {
           type: 'radio', checked: cfg.provider === provider, click: () => pickProvider(provider),
         })),
         { type: 'separator' },
+        // her three brain tiers: picking one picks that model from the provider's list
+        ...(chatModels?.length > 1 ? [
+          { label: th ? 'ระดับความฉลาด' : 'Brain', enabled: false },
+          ...TIERS.map((tier) => {
+            const model = tierModel(chatModels, tier);
+            const name = { normal: th ? 'NORMAL · เร็ว ประหยัด' : 'NORMAL · fast', higher: th ? 'HIGHER · สมดุล' : 'HIGHER · balanced', max: th ? 'MAX INTELLIGENCE · ฉลาดสุด' : 'MAX INTELLIGENCE' }[tier];
+            return { label: `${name} (${model})`, type: 'radio', checked: cfg.brainTier === tier && pickModel(cfg) === model, click: () => updateConfig({ brainTier: tier, chatModel: model }) };
+          }),
+          { type: 'separator' },
+        ] : []),
         { label: th ? 'โมเดล' : 'Model', enabled: false },
         ...(chatModels?.length
           ? chatModels.map((name) => ({
