@@ -297,6 +297,7 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
+| **0.19.0** | Telegram (text, voice, photos, video), Vibecode from your phone with Claude Code / Codex, news topics and briefs, local tasks, VIP mail, follow-ups, meeting prep, timed routines, remote PC control with PIN, LINE alerts |
 | **0.18.0** | Personal assistant: MCP servers (Claude Code's mcp.json), Gmail and Google Calendar, alerts for important mail and meetings; tools that write ask first |
 | 0.17.1 | Fix: dialogs that sometimes stopped taking clicks; size, full/upper body and AI model in the right-click menu |
 | 0.17.0 | Three brain tiers; Kokoro free local voice + ElevenLabs + Fish + your own server; voice effects (pitch, robot, glitch, layers); ten security switches; mini player and dancing to music |
