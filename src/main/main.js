@@ -448,6 +448,7 @@ function rebuildTray() {
     { label: t.help, click: () => sendCommand('welcome') },
     ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
     { label: t.talk, click: () => sendCommand('chat') },
+    { label: resolveLang(cfg.lang) === 'th' ? 'ตั้งค่าทั้งหมด…' : 'All settings…', click: () => sendCommand('settings') },
     { label: resolveLang(cfg.lang) === 'th' ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
     { label: 'สั่งงานด้วยเสียง / ตั้งคำเรียก…', click: () => sendCommand('listening') },
     { label: 'ปิดไมโครโฟนทันที', click: () => { listening?.stop(); sendCommand('listening-stop'); } },

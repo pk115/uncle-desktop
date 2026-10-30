@@ -106,3 +106,8 @@
 .speech-stop { border-left: 4px solid var(--green); box-shadow: 4px 4px 0 var(--violet); }
 .listening-stop { border-left-color: var(--red); }
 @media (prefers-reduced-motion: reduce) { .character-picker button { transition: none; } }
+#all-settings .speech-box::before { content: 'UNCLE // MAINFRAME'; }
+.settings-box h2 { margin: 14px 0 4px; font-size: 16px; color: var(--green); }
+.settings-row { display: grid; grid-template-columns: 9em 1fr auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--ink-2); font-size: 14px; }
+.settings-row span { color: var(--paper-2); overflow-wrap: anywhere; }
+.settings-row button { margin-right: 0; }

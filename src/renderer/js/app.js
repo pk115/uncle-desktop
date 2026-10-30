@@ -12,6 +12,7 @@ import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
+import { Settings } from './settings.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
 import { Look } from './look.js';
@@ -44,6 +45,7 @@ async function boot() {
   let picker = null;
   let speechUI = null;
   let listeningUI = null;
+  let settingsUI = null;
   const loadCharacter = (character) => Promise.all([
     loadImage(characterAsset(character, 'atlas')),
     loadImage(characterAsset(character, 'portrait')),
@@ -129,7 +131,7 @@ async function boot() {
   };
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
-    if (picker?.open || speechUI?.open || listeningUI?.open) return setInteractive(true);
+    if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open) return setInteractive(true);
     if (capri.dragging) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
@@ -303,6 +305,10 @@ async function boot() {
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
   });
   listeningUI.configure(config);
+  settingsUI = new Settings({ host, root: document.getElementById('all-settings'),
+    onOpen: (id) => ({ ai: () => setup.chat(), characters: () => picker.show(), speech: () => speechUI.show(), listening: () => listeningUI.show(), customize: () => custom.open() })[id](),
+    onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open || listeningUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+  });
   chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
   chat.onSpeechStop = () => { speechUI.stop(); listeningUI.stop(); };
   brain.onTalk = () => chat.start();
@@ -718,6 +724,7 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'settings') { picker.hide(); speechUI.hide(); listeningUI.hide(); await settingsUI.show(); return; }
     const t = brain.t;
     switch (cmd.name) {
       case 'characters':
