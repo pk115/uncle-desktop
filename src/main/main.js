@@ -52,6 +52,17 @@ let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
+const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
+// a.b.c newer than x.y.z
+const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); const i = [0, 1, 2].find((k) => (x[k] || 0) !== (y[k] || 0)); return i !== undefined && (x[i] || 0) > (y[i] || 0); };
+// macOS: the latest release's version; newer than hers, she tells you (and it's yours to download)
+async function macUpdateCheck() {
+  const res = await fetch('https://api.github.com/repos/pk115/uncle-desktop/releases/latest', { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const latest = String((await res.json()).tag_name || '').replace(/^v/, '');
+  if (latest && newer(latest, app.getVersion())) sendCommand('update', { version: latest, download: true });
+  return latest || null;
+}
 let settingsGroups = []; // the settings rebuildTray lays out, for her settings dialog's tabs
 let settingsClicks = []; // their handlers, by the id menu:groups gave each
 let demoTimer = null;
@@ -310,6 +321,8 @@ function createOverlay() {
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // macOS: on every Space, over full-screen apps too, as she is over everything on Windows
+  if (process.platform === 'darwin') overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
   // always shown: put away, she's still there as her biochip in the corner. Sized again first:
   // Windows keeps a new window inside the work area, and resting on the taskbar it covers it too.
@@ -843,7 +856,8 @@ async function pickClaudeFolder() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
+  let icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
+  if (process.platform === 'darwin') icon = icon.resize({ height: 18 }); // the menu bar's size
   tray = new Tray(icon);
   tray.setToolTip('Uncle Desktop');
   tray.on('click', () => sendCommand('status'));
@@ -999,13 +1013,14 @@ function registerIpc() {
   ipcMain.handle('config:get', () => rendererConfig());
   ipcMain.handle('hooks:status', () => activeHooks().status());
   ipcMain.handle('config:set', (_e, patch) => updateConfig(patch));
-  // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
   ipcMain.handle('update:check', async () => {
-    if (!updater) return { version: app.getVersion(), latest: null };
+    if (!app.isPackaged) return { version: app.getVersion(), latest: null };
+    if (process.platform === 'darwin') return { version: app.getVersion(), latest: await macUpdateCheck(), manual: true };
     const r = await updater.checkForUpdates();
     return { version: app.getVersion(), latest: r?.updateInfo?.version || null };
   });
-  ipcMain.handle('update:install', () => updater?.quitAndInstall());
+  ipcMain.handle('update:install', () => (process.platform === 'darwin' ? shell.openExternal(RELEASES) : updater?.quitAndInstall()));
+  // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
   ipcMain.handle('config:reset', () => {
     speech.stop(); listening?.stop(); computer?.stop(); voiceAgentAPI?.stop(); voiceAgentSession = null;
     config.reset();
@@ -1369,6 +1384,9 @@ function main() {
   }
   app.on('second-instance', () => sendCommand('status'));
   if (process.platform === 'win32') app.setAppUserModelId('uncle.desktop');
+  // opened from Finder, a Mac app gets a bare PATH: where Homebrew and installers put ollama, claude, codex
+  if (process.platform === 'darwin') process.env.PATH = ['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin'), process.env.PATH].join(':');
+  if (process.platform === 'darwin') app.dock?.hide(); // she lives in the menu bar, as in the Windows tray
 
   app.whenReady().then(() => {
     userCharacters = createUserCharacters(path.join(app.getPath('userData'), 'characters'), nativeImage, CHARACTERS);
@@ -1396,7 +1414,12 @@ function main() {
     const taken = registerHotkeys();
     if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
     // Installed copies update from GitHub Releases: downloaded quietly, she tells you, installed now or when she quits.
-    if (app.isPackaged) {
+    // A Mac copy isn't signed by Apple, so it can't update itself: she tells you, you download it.
+    if (app.isPackaged && process.platform === 'darwin') {
+      const checkUpdate = () => macUpdateCheck().catch((err) => console.warn('[uncle] update check failed:', err.message));
+      checkUpdate();
+      setInterval(checkUpdate, 6 * 60 * 60 * 1000);
+    } else if (app.isPackaged) {
       updater = require('electron-updater').autoUpdater;
       updater.on('update-downloaded', (info) => sendCommand('update', { version: info.version }));
       const checkUpdate = () => updater.checkForUpdates().catch((err) => console.warn('[uncle] update check failed:', err.message));

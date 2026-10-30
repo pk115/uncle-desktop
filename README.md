@@ -62,6 +62,7 @@ Learn how to import and customize characters in [docs/CHARACTERS.md](docs/CHARAC
 
 - [Node.js](https://nodejs.org/) v20 or newer
 - Windows 10/11 (window tracking & sitting features are optimized for Windows)
+- macOS (beta): download the `.dmg` and follow [the Mac install guide (Thai)](docs/INSTALL_MAC_TH.md)
 
 ### Installation
 

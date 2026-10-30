@@ -9,7 +9,7 @@ function createNative({ script = path.join(__dirname, 'computer.ps1').replace(/a
   let child, cancelFile, directory, pending = new Map(), buffer = '';
   function stop() { const old=child, marker=cancelFile; child=null;cancelFile=null;directory=null;if(old){try{fs.writeFileSync(marker,'stop');}catch{}setTimeout(()=>old.kill(),180);} for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('หยุดการควบคุมแล้ว'));}pending.clear();buffer=''; }
   function request(args, signal) {
-    if (process.platform !== 'win32') return Promise.reject(new Error('ควบคุมเครื่องรองรับ Windows ในรุ่นนี้'));
+    if (process.platform !== 'win32') return Promise.reject(new Error('ควบคุมเครื่องยังใช้ได้เฉพาะบน Windows · บน Mac กำลังพัฒนา'));
     if (signal?.aborted) return Promise.reject(new Error('หยุดแล้ว'));
     if (!child) {
       directory=fs.mkdtempSync(path.join(os.tmpdir(),'uncle-input-'));cancelFile=path.join(directory,'stop');const ownDirectory=directory;

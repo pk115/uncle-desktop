@@ -1,6 +1,9 @@
 'use strict';
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const { spawn, execFile } = require('node:child_process');
+const run = require('node:util').promisify(execFile);
 const { Worker } = require('node:worker_threads');
 
 const CLOUD_VOICES = ['coral', 'alloy', 'nova', 'onyx'];
@@ -42,11 +45,27 @@ function edgeSynthesize(text, voice, rate, signal) {
     worker.on('exit', () => { if (!settled) finish(new Error('บริการเสียงไทย Edge หยุดทำงาน')); });
   });
 }
+// `say -v ?` lines, "Kanya   th_TH    # สวัสดี", as the voices speech.ps1 lists on Windows
+function parseSayVoices(out) {
+  return out.split('\n').map((l) => l.match(/^(.+?)\s+([a-z]{2,3}_[A-Za-z0-9]+)\s+#/)).filter(Boolean)
+    .map(([, name, lang]) => ({ id: name.trim(), name: name.trim(), lang: lang.replace('_', '-') }));
+}
+// macOS's own voices through `say`, in the shape speech.ps1 answers with
+async function mac(action, payload, signal) {
+  if (action === 'voices') return parseSayVoices((await run('say', ['-v', '?'], { signal, timeout: 15000 })).stdout);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-say-')), file = path.join(dir, 'speech.wav');
+  try {
+    await run('say', ['-v', payload.voice, '-r', String(Math.round(175 * payload.rate)), '--file-format=WAVE', '--data-format=LEI16@22050', '-o', file, '--', payload.text], { signal, timeout: 60000 })
+      .catch(() => { throw new Error(signal?.aborted ? 'หยุดเสียงแล้ว' : 'macOS สร้างเสียงไม่สำเร็จ กรุณาตรวจเสียงที่ติดตั้ง'); });
+    return { audio: (await fs.readFile(file)).toString('base64') };
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+}
 function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = fetch, edge = edgeSynthesize } = {}) {
   let running = null;
   let cachedVoices = null;
   function stop() { running?.abort(); running = null; }
   function windows(action, payload, signal) {
+    if (process.platform === 'darwin') return mac(action, payload, signal);
     return new Promise((resolve, reject) => {
       const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Action', action], { windowsHide: true, signal });
       let out = '', settled = false;
@@ -65,7 +84,7 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
     });
   }
   async function voices(refresh = false) {
-    if (process.platform !== 'win32') return [];
+    if (!['win32', 'darwin'].includes(process.platform)) return [];
     if (!cachedVoices || refresh) {
       const list = await windows('voices');
       cachedVoices = Array.isArray(list) ? list : [list];
@@ -83,7 +102,7 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
         const list = await voices();
         if (controller.signal.aborted) throw new Error('หยุดเสียงแล้ว');
         const selected = list.find((v) => v.id === settings.voice) || (!settings.voice ? list.find((v) => /^th/i.test(v.lang)) : null);
-        if (!selected) throw new Error('ไม่พบเสียงที่เลือก กรุณาติดตั้งเสียงภาษาไทยใน Windows แล้วกดรีเฟรช');
+        if (!selected) throw new Error('ไม่พบเสียงที่เลือก กรุณาติดตั้งเสียงภาษาไทยในเครื่อง (Windows หรือ macOS) แล้วกดรีเฟรช');
         if (/[\u0e00-\u0e7f]/.test(text) && !/^th/i.test(selected.lang)) throw new Error('เสียงที่เลือกไม่รองรับภาษาไทย กรุณาติดตั้งเสียงไทยหรือเลือกเสียง AI ออนไลน์');
         return await windows('speak', { text, voice: selected.id, rate: settings.rate }, controller.signal);
       }
@@ -108,4 +127,4 @@ function createSpeech({ script = path.join(__dirname, 'speech.ps1'), fetcher = f
   }
   return { voices, speak, stop };
 }
-module.exports = { createSpeech, speechSettings, DEFAULT_SPEECH, CLOUD_VOICES, EDGE_VOICES };
+module.exports = { createSpeech, parseSayVoices, speechSettings, DEFAULT_SPEECH, CLOUD_VOICES, EDGE_VOICES };

@@ -898,8 +898,9 @@ async function boot() {
       case 'update': // a new version downloaded (main.js): now, or when she quits
         panel.say({
           kind: 'info', face: 'smug', hold: null,
-          line: brain.lang === 'th' ? `มีเวอร์ชันใหม่ ${cmd.version} แล้วนะ โหลดเสร็จแล้ว` : `Version ${cmd.version} is ready.`,
-          actions: [{ id: 'now', label: brain.lang === 'th' ? 'รีสตาร์ทเพื่ออัปเดต' : 'Restart to update', primary: true }, { id: 'later', label: brain.lang === 'th' ? 'ไว้ทีหลัง' : 'Later' }],
+          line: brain.lang === 'th' ? `มีเวอร์ชันใหม่ ${cmd.version} แล้วนะ${cmd.download ? '' : ' โหลดเสร็จแล้ว'}` : `Version ${cmd.version} is ${cmd.download ? 'out' : 'ready'}.`,
+          // on a Mac (not signed by Apple) she can't install it herself: the button opens the download page
+          actions: [{ id: 'now', label: cmd.download ? (brain.lang === 'th' ? 'ดาวน์โหลดเวอร์ชันใหม่' : 'Download it') : (brain.lang === 'th' ? 'รีสตาร์ทเพื่ออัปเดต' : 'Restart to update'), primary: true }, { id: 'later', label: brain.lang === 'th' ? 'ไว้ทีหลัง' : 'Later' }],
           onAction: (id) => (id === 'now' ? host.installUpdate() : panel.hide()),
         });
         break;

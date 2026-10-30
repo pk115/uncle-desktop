@@ -22,11 +22,13 @@
     "check:llm": "node scripts/check-llm.js",
     "test:hooks": "node --test tests/hooks.test.js",
     "dist": "electron-builder --win",
+    "dist:mac": "electron-builder --mac --publish never",
     "release": "electron-builder --win --publish always",
     "test:computer:live": "node scripts/smoke-computer.js",
     "prestart": "node scripts/vendor-voice-agent.js",
     "predev": "node scripts/vendor-voice-agent.js",
-    "predist": "node scripts/vendor-voice-agent.js"
+    "predist": "node scripts/vendor-voice-agent.js",
+    "predist:mac": "node scripts/vendor-voice-agent.js"
   },
   "keywords": [
     "desktop-companion",
@@ -81,6 +83,20 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icons/capri.ico"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "icon": "assets/icons/capri-512.png",
+      "category": "public.app-category.entertainment",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Uncle Desktop listens for your voice commands when you turn the mic on.",
+        "NSAppleEventsUsageDescription": "Uncle Desktop reads which window is in front so the character can react to it."
+      }
+    },
+    "dmg": {
+      "artifactName": "Uncle-Desktop-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": true,

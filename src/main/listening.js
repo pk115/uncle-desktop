@@ -40,7 +40,7 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
     if (!['small', 'thai-medium'].includes(name)) throw new Error('โมเดลไม่ถูกต้อง');
     if (installing) return installing;
     installing = (async () => {
-      if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('ตัวติดตั้งโมเดลรองรับ Windows x64');
+      if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error(process.platform === 'darwin' ? 'โมเดลรับเสียงในเครื่องยังไม่รองรับ Mac · เลือกถอดเสียงด้วย OpenAI หรือ Gemini แทนได้' : 'ตัวติดตั้งโมเดลรองรับ Windows x64');
       await fs.mkdir(directory, { recursive: true });
       for (const [artifact, url, hash, max] of [ARTIFACTS[0], name === 'thai-medium' ? THAI_MODEL : ARTIFACTS[1]]) {
         const target = path.join(directory, artifact), partial = `${target}.part`;
