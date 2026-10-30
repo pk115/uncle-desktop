@@ -128,6 +128,41 @@ async function learnAboutUser(history) {
   }
 }
 
+// Her shortcuts (her settings): the keys are config.hotkeys, '' for none.
+const HOTKEY_ACTIONS = {
+  toggle: () => toggleVisible(),
+  voice: () => sendCommand('listening-toggle'),
+  mute: () => { listening?.stop(); sendCommand('listening-stop'); },
+};
+const hotkeys = () => ({ ...config.DEFAULTS.hotkeys, ...config.load().hotkeys });
+// Registered again from scratch; returns the actions whose keys another app holds (or that aren't keys).
+function registerHotkeys() {
+  globalShortcut.unregisterAll();
+  const keys = hotkeys();
+  return Object.keys(HOTKEY_ACTIONS).filter((name) => {
+    if (!keys[name]) return false;
+    try {
+      return !globalShortcut.register(keys[name], HOTKEY_ACTIONS[name]);
+    } catch {
+      return true;
+    }
+  });
+}
+function saveHotkeys(patch = {}) {
+  const keys = Object.fromEntries(Object.keys(HOTKEY_ACTIONS).map((name) => [name, typeof patch[name] === 'string' ? patch[name].slice(0, 60) : hotkeys()[name]]));
+  const used = Object.values(keys).filter(Boolean);
+  if (new Set(used).size !== used.length) throw new Error('คีย์ลัดซ้ำกัน ใช้ปุ่มเดียวกันกับสองคำสั่งไม่ได้');
+  const before = hotkeys();
+  config.save({ hotkeys: keys });
+  const taken = registerHotkeys();
+  if (taken.length) { // put back what worked before rather than leave them dead
+    config.save({ hotkeys: before });
+    registerHotkeys();
+  }
+  rebuildTray();
+  return { hotkeys: hotkeys(), taken };
+}
+
 function forgetChats() {
   llm.resetClaude();
   saveMemory({ history: [], claude: null });
@@ -436,7 +471,7 @@ function rebuildTray() {
         click: () => updateConfig({ characterId: character.id }),
       })),
     },
-    { label: cfg.visible ? t.hide : t.show, accelerator: 'Ctrl+Alt+C', click: () => toggleVisible() },
+    { label: cfg.visible ? t.hide : t.show, accelerator: hotkeys().toggle || undefined, click: () => toggleVisible() },
     { type: 'separator' },
     {
       label: t.size,
@@ -930,6 +965,7 @@ function registerIpc() {
   ipcMain.handle('chat:memory', () => readMemory().history || []);
   ipcMain.handle('notes:get', () => ({ personality: readNotes('personality'), me: readNotes('me') }));
   ipcMain.handle('notes:open', (_e, name) => (name in NOTES ? openNotes(name) : 'unknown notes'));
+  ipcMain.handle('hotkeys:save', (_e, patch) => saveHotkeys(patch));
   ipcMain.on('chat:remember', (_e, { history, characterId } = {}) => {
     if (!Array.isArray(history) || !CHARACTERS.some((c) => c.id === characterId)) return;
     saveMemory({ history }, characterId);
@@ -1209,10 +1245,8 @@ function main() {
       onEvent: (evt) => !llm.isChatSession(evt.session_id) && overlay?.webContents.send('claude:event', evt),
       onDebug: DEV ? debugHandler : null,
     });
-    globalShortcut.register('Control+Alt+C', () => toggleVisible());
-    const voiceKey = globalShortcut.register('Control+Alt+V', () => sendCommand('listening-toggle'));
-    const muteKey = globalShortcut.register('Control+Alt+M', () => { listening?.stop(); sendCommand('listening-stop'); });
-    if (!voiceKey || !muteKey) console.warn('[uncle] Voice shortcut unavailable; use the voice window or tray menu');
+    const taken = registerHotkeys();
+    if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
     // Installed copies update from GitHub Releases: downloaded quietly, installed when she quits.
     if (app.isPackaged) {
       const { autoUpdater } = require('electron-updater');
