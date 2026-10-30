@@ -1,6 +1,6 @@
 {
   "name": "uncle-desktop",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "A Thai-friendly AI desktop companion with selectable characters and coding agent status.",
   "author": "TheUncleDev",
   "repository": "github:pk115/uncle-desktop",
@@ -85,7 +85,15 @@
       "icon": "assets/icons/capri.ico"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icons/capri-512.png",
       "category": "public.app-category.entertainment",
       "identity": "-",
