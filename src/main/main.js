@@ -19,6 +19,12 @@ const speech = createSpeech({ kokoroDir: () => path.join(app.getPath('userData')
 const { createListening, listeningSettings } = require('./listening');
 const { createNative, createComputer, SECURITY, SWITCHES, LEVELS } = require('./computer');
 const { TIERS, tierModel } = require('./tiers');
+const { createMcp } = require('./mcp');
+const { chatWithTools } = require('./tool-chat');
+const { createAssistant, MAIL_QUERY } = require('./assistant');
+let personal = null; // Gmail and Calendar through MCP, and their alerts
+let mcp = null; // her MCP servers (userData/mcp.json), connected once she's ready
+const mcpAsks = new Map(); // a tool waiting for your yes: id -> resolve
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
 let voiceAgentAPI, voiceAgentSession=null;
@@ -658,6 +664,33 @@ function rebuildTray() {
       ...item.sound.submenu,
     ] },
     { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, { label: th ? 'มินิเพลเยอร์ และเต้นตามเพลง' : 'Mini player, and dancing to music', type: 'checkbox', checked: cfg.miniPlayer !== false, click: (it) => updateConfig({ miniPlayer: it.checked }) }, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
+    // her assistant: Gmail and Google Calendar (MCP), and her alerts
+    { id: 'assistant', title: th ? 'ผู้ช่วย' : 'Assistant', items: [
+      ...['gmail', 'calendar'].map((kind) => {
+        const s = mcp?.info().find((x) => x.name === kind);
+        const state = !s ? (th ? 'ยังไม่เชื่อม' : 'not connected') : s.status === 'ready' ? (th ? `เชื่อมแล้ว · ${s.tools.length} เครื่องมือ` : `connected · ${s.tools.length} tools`) : s.status === 'error' ? `error: ${s.error}` : s.status;
+        const name = kind === 'gmail' ? 'Gmail' : 'Google Calendar';
+        return { label: `${name}: ${state}`.slice(0, 120), submenu: [
+          { label: s ? (th ? `เชื่อม ${name} ใหม่…` : `Reconnect ${name}…`) : (th ? `เชื่อม ${name}…` : `Connect ${name}…`), click: () => connectAssistant(kind) },
+          ...(s ? [{ label: th ? `ยกเลิกการเชื่อม ${name}` : `Disconnect ${name}`, click: () => personal.disconnect(kind).then(rebuildTray) }] : []),
+        ] };
+      }),
+      { label: th ? 'เลือกไฟล์ Google OAuth key ใหม่…' : 'Choose a Google OAuth key file…', click: () => pickGoogleKeys().catch((err) => sendCommand('assistant-alert', { kind: 'error', message: err.message })) },
+      { label: th ? 'วิธีสร้าง Google OAuth key…' : 'How to make a Google OAuth key…', click: () => shell.openExternal('https://github.com/pk115/uncle-desktop/blob/main/docs/ASSISTANT_TH.md') },
+      { type: 'separator' },
+      { label: th ? 'แจ้งเตือนเมลสำคัญ' : 'Important mail alerts', type: 'checkbox', checked: cfg.mailAlerts !== false, click: (it) => updateConfig({ mailAlerts: it.checked }) },
+      { label: th ? 'แจ้งเตือนก่อนนัดเริ่ม' : 'Meeting alerts', type: 'checkbox', checked: cfg.eventAlerts !== false, click: (it) => updateConfig({ eventAlerts: it.checked }) },
+      { label: th ? 'เตือนก่อนนัด' : 'Alert before a meeting', submenu: [5, 10, 15, 30].map((m) => ({ label: th ? `${m} นาที` : `${m} min`, type: 'radio', checked: (cfg.eventLead || 10) === m, click: () => updateConfig({ eventLead: m }) })) },
+      { label: th ? 'เมลแบบไหนนับว่าสำคัญ' : 'Which mail counts as important', submenu: [
+        [MAIL_QUERY, th ? 'Gmail ติดป้ายสำคัญ และยังไม่อ่าน' : 'Marked important by Gmail, unread'],
+        ['is:unread is:starred newer_than:1d', th ? 'ติดดาว และยังไม่อ่าน' : 'Starred, unread'],
+        ['is:unread category:primary newer_than:1d', th ? 'ทุกเมลในกล่องหลักที่ยังไม่อ่าน' : 'All unread in Primary'],
+      ].map(([q, label]) => ({ label, type: 'radio', checked: (cfg.mailQuery || MAIL_QUERY) === q, click: () => updateConfig({ mailQuery: q }) })) },
+      { type: 'separator' },
+      { label: `MCP: ${mcp?.info().length || 0} server · ${mcp?.tools().length || 0} ${th ? 'เครื่องมือ' : 'tools'}`, enabled: false },
+      { label: th ? 'แก้ไข mcp.json…' : 'Edit mcp.json…', click: () => { if (!fs.existsSync(mcp.file)) mcp.save({}); shell.openPath(mcp.file); } },
+      { label: th ? 'โหลด MCP ใหม่' : 'Reload MCP servers', click: () => mcp.start().then(rebuildTray) },
+    ] },
     { id: 'agents', title: 'Coding AI', items: [
       item.watch,
       ...(cfg.claude ? [
@@ -735,6 +768,25 @@ function runHooks(action, { quiet = false } = {}) {
 
 // The model she talks with: the one picked in her menu if it's still installed, else the first one
 // on this PC (a cloud model only once you pick it).
+// Gmail or Calendar: the key file first if there's none yet, then sign in (her browser), then reconnect
+async function pickGoogleKeys() {
+  const pick = await dialog.showOpenDialog({ title: 'Google OAuth key (Desktop app)', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
+  if (pick.canceled || !pick.filePaths[0]) return false;
+  personal.useKeys(pick.filePaths[0]);
+  return true;
+}
+async function connectAssistant(kind) {
+  try {
+    if (!personal.hasKeys() && !(await pickGoogleKeys())) return;
+    sendCommand('assistant-alert', { kind: 'info', message: 'เปิดเบราว์เซอร์ให้เข้าสู่ระบบ Google แล้ว อนุญาตเสร็จแล้วกลับมาที่นี่' });
+    await personal.connect(kind);
+    sendCommand('assistant-alert', { kind: 'info', message: kind === 'gmail' ? 'เชื่อม Gmail แล้ว ถามเรื่องเมลได้เลย และฉันจะบอกเมื่อมีเมลสำคัญ' : 'เชื่อมปฏิทินแล้ว ถามนัดได้เลย และฉันจะเตือนก่อนนัดเริ่ม' });
+  } catch (err) {
+    sendCommand('assistant-alert', { kind: 'error', message: err.message });
+  }
+  rebuildTray();
+}
+
 function pickModel(cfg = config.load()) {
   if (!chatModels?.length) return null;
   if (chatModels.includes(cfg.chatModel)) return cfg.chatModel;
@@ -1110,7 +1162,22 @@ function registerIpc() {
         overlay?.webContents.send('chat:delta', { id, text });
       };
       const cfg = config.load();
-      const text = await chatWithFallback(cfg, messages, send, abort.signal, () => streamed);
+      const plain = (msgs, s) => chatWithFallback(cfg, msgs, s, abort.signal, () => streamed);
+      // her MCP tools (mail, calendar…): offered to the AI; one that writes asks you first
+      const tools = cfg.provider === 'claude' ? [] : mcp?.tools() || [];
+      const text = tools.length ? await chatWithTools({
+        tools, messages, send, chat: plain,
+        mayWrite: computerOptions().switches.send,
+        call: (server, name, args) => mcp.call(server, name, args, { signal: abort.signal }),
+        confirm: (tool, args) => new Promise((resolve) => {
+          const ask = randomUUID();
+          mcpAsks.set(ask, resolve);
+          const detail = Object.entries(args).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ').slice(0, 240);
+          sendCommand('mcp-confirm', { id: ask, tool: `${tool.server}/${tool.name}`, detail });
+          setTimeout(() => { if (mcpAsks.delete(ask)) resolve(false); }, 120000);
+          abort.signal.addEventListener('abort', () => { if (mcpAsks.delete(ask)) resolve(false); }, { once: true });
+        }),
+      }) : await plain(messages, send);
       if (cfg.provider === 'claude' && cfg.characterId === config.load().characterId && !abort.signal.aborted) saveMemory({ claude: llm.claudeMemory() });
       return { ok: true, text };
     } catch (err) {
@@ -1120,6 +1187,7 @@ function registerIpc() {
     }
   });
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
+  ipcMain.on('mcp:answer', (_e, { id, yes } = {}) => { const resolve = mcpAsks.get(id); if (resolve) { mcpAsks.delete(id); resolve(yes === true); } });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
   ipcMain.handle('look:snap', async () => {
     try {
@@ -1465,6 +1533,10 @@ function main() {
       setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
     }
     watchMusic();
+    mcp = createMcp({ file: path.join(app.getPath('userData'), 'mcp.json'), version: app.getVersion(), log: (line) => console.log(line) });
+    mcp.start().then(() => rebuildTray()).catch(() => {});
+    personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: (a) => sendCommand('assistant-alert', a), log: (line) => console.log(line) });
+    personal.start();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
@@ -1484,6 +1556,7 @@ function main() {
   });
 
   app.on('will-quit', () => {
+    mcp?.stop();
     computer?.stop(); computerNative?.stop();
     speech.stop();
     listening?.stop();

@@ -29,6 +29,7 @@
   - [Voice commands](#-voice-commands)
   - [The AI agent: computer control](#-the-ai-agent-computer-control)
   - [Quick asks in chat](#-quick-asks-in-chat)
+  - [Personal assistant: mail and calendar](#-personal-assistant-mail-and-calendar-mcp)
   - [Music and the mini player](#-music-and-the-mini-player)
   - [Watching your coding AI](#-watching-your-coding-ai)
   - [Settings and system](#-settings-and-system)
@@ -177,6 +178,15 @@ Done right away, without a multi-step job:
 - **Google searches and Roblox games**
 - **Reminders:** e.g. *"remind me to eat in 20 minutes"*
 - **Screenshots, and looking at your screen**
+
+### 📬 Personal assistant: mail and calendar (MCP)
+
+- **Gmail and Google Calendar:** connect them in Settings › **Assistant** with one Google OAuth key file. See [the guide (Thai)](docs/ASSISTANT_TH.md)
+- **Ask in chat:** "summarize today's mail", "draft a reply to A", "what's on tomorrow", "book a meeting Wednesday 3 pm"
+- **Important mail alerts:** checked every 3 minutes, with a button to open the mail
+- **Meeting alerts:** 5, 10, 15 or 30 minutes before, with a button to join Meet, Zoom or Teams
+- **Always asks first:** anything that sends, deletes or creates (sending mail, creating or deleting events)
+- **Any other MCP server:** add it to `mcp.json`, the same shape as Claude Code's, and its tools work in chat
 
 ### 🎵 Music and the mini player
 

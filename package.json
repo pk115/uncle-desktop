@@ -51,6 +51,7 @@
   "dependencies": {
     "@fontsource/chakra-petch": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "electron-updater": "^6.8.11",
     "kokoro-js": "1.2.1",
     "node-edge-tts": "1.2.12"

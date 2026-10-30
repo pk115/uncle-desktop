@@ -772,6 +772,23 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'assistant-alert') { // her assistant: important mail, a meeting soon, or how setup went
+      const link = cmd.link && /^https:\/\//.test(cmd.link) ? cmd.link : '';
+      if (cmd.kind === 'mail' || cmd.kind === 'event') {
+        voice.play('remind'); capri.wake();
+        const line = cmd.kind === 'mail' ? `📧 เมลสำคัญจาก ${cmd.from.replace(/<[^>]*>/, '').trim() || 'ไม่ทราบชื่อ'}` : `📅 อีก ${cmd.minutes} นาที: ${cmd.summary}`;
+        const actions = [...(link ? [{ id: 'open', label: cmd.kind === 'mail' ? 'เปิดเมล' : /meet|zoom|teams/.test(link) ? 'เข้าประชุม' : 'ดูนัด', primary: true }] : []), { id: 'ok', label: 'รับทราบ' }];
+        panel.say({ kind: 'remind', face: 'look', line, quote: cmd.kind === 'mail' ? cmd.subject : '', actions, onAction: (id) => { if (id === 'open') host.openSite(link); panel.hide(); }, hold: null });
+      } else panel.say({ kind: cmd.kind === 'error' ? 'error' : 'info', line: cmd.message, hold: cmd.kind === 'error' ? 9000 : 6000 });
+      return;
+    }
+    if (cmd.name === 'mcp-confirm') { // a tool that writes, sends or deletes: your yes first
+      const actions = [{ id: 'yes', label: `อนุญาต: ${cmd.tool}${cmd.detail ? ` (${cmd.detail.slice(0, 70)})` : ''}`, primary: true }, { id: 'no', label: 'ไม่ต้อง' }];
+      const onAction = (id) => { host.mcpAnswer(cmd.id, id === 'yes'); panel.setActions([]); };
+      if (chat.open) panel.setActions(actions, onAction);
+      else panel.say({ kind: 'remind', face: 'look', line: `ให้ฉันใช้ ${cmd.tool} ไหม?`, quote: cmd.detail, actions, onAction, hold: null });
+      return;
+    }
     if (cmd.name === 'now-playing') { // her mini player: the song, its buttons; she dances while it plays
       let mp = document.getElementById('mini-player');
       if (!mp) {
