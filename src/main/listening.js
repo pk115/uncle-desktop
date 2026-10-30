@@ -26,13 +26,17 @@ const ARTIFACTS = [
   ['ggml-small-q5_1.bin', 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin', 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb', 200 * 1024 * 1024],
 ];
 const THAI_MODEL = ['thonburian-medium-q5_0.bin', 'https://huggingface.co/suebphatt/thonburian-whisper-ggml/resolve/d271c27020490ac297fceba344c8e97b0200255f/thonburian-medium-q5_0.bin', '25fe6beb59477b2f161371fb206e898843058f22ac13036159f83eba0a92336d', 550 * 1024 * 1024];
-function createListening({ directory, fetcher = fetch, runner = run }) {
+// macOS: whisper.cpp from Homebrew (`brew install whisper-cpp`), which runs on the GPU (Metal) there
+const MAC = process.platform === 'darwin';
+const BREW = ['/opt/homebrew/bin', '/usr/local/bin'];
+const onBrew = name => BREW.map(dir => path.join(dir, name)).find(f => require('node:fs').existsSync(f));
+function createListening({ directory, fetcher = fetch, runner = run, executable: fixed }) {
   let active = null, installing = null;
   const modelPath = name => path.join(directory, name === 'thai-medium' ? THAI_MODEL[0] : ARTIFACTS[1][0]);
-  const executable = path.join(directory, 'runtime', 'Release', 'whisper-cli.exe');
+  const exe = () => fixed || (MAC ? onBrew('whisper-cli') || path.join(BREW[0], 'whisper-cli') : path.join(directory, 'runtime', 'Release', 'whisper-cli.exe'));
   const stop = () => { active?.abort(); active = null; };
   async function info(name = 'small') {
-    const runtime = Boolean(await fs.stat(executable).catch(() => null));
+    const runtime = Boolean(await fs.stat(exe()).catch(() => null));
     const models = Object.fromEntries(await Promise.all(['small', 'thai-medium'].map(async id => [id, runtime && Boolean(await fs.stat(modelPath(id)).catch(() => null))])));
     return { ready: Boolean(models[name]), models, installing: Boolean(installing) };
   }
@@ -40,9 +44,16 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
     if (!['small', 'thai-medium'].includes(name)) throw new Error('โมเดลไม่ถูกต้อง');
     if (installing) return installing;
     installing = (async () => {
-      if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error(process.platform === 'darwin' ? 'โมเดลรับเสียงในเครื่องยังไม่รองรับ Mac · เลือกถอดเสียงด้วย OpenAI หรือ Gemini แทนได้' : 'ตัวติดตั้งโมเดลรองรับ Windows x64');
+      if (!MAC && (process.platform !== 'win32' || process.arch !== 'x64')) throw new Error('ตัวติดตั้งโมเดลรองรับ Windows x64 และ macOS');
       await fs.mkdir(directory, { recursive: true });
-      for (const [artifact, url, hash, max] of [ARTIFACTS[0], name === 'thai-medium' ? THAI_MODEL : ARTIFACTS[1]]) {
+      if (MAC && !(await fs.stat(exe()).catch(() => null))) {
+        const brew = onBrew('brew');
+        if (!brew) throw new Error('บน Mac ต้องมี Homebrew ก่อน ติดตั้งจาก brew.sh แล้วกดดาวน์โหลดอีกครั้ง');
+        progress('กำลังติดตั้ง whisper-cpp ผ่าน Homebrew…');
+        await runner(brew, ['install', 'whisper-cpp'], { timeout: 15 * 60000 }).catch(() => { throw new Error('ติดตั้ง whisper-cpp ไม่สำเร็จ ลองพิมพ์ brew install whisper-cpp ใน Terminal'); });
+      }
+      const model = name === 'thai-medium' ? THAI_MODEL : ARTIFACTS[1];
+      for (const [artifact, url, hash, max] of MAC ? [model] : [ARTIFACTS[0], model]) {
         const target = path.join(directory, artifact), partial = `${target}.part`;
         if (await fs.readFile(target).then(b => createHash('sha256').update(b).digest('hex') === hash).catch(() => false)) continue;
         progress(`ดาวน์โหลด ${artifact}…`);
@@ -55,6 +66,7 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
         } catch (error) { await file.close(); await fs.rm(partial, { force: true }); throw error; }
         await file.close(); await fs.rename(partial, target);
       }
+      if (MAC) { if (!(await info(name)).ready) throw new Error('ไม่พบ whisper-cli หลังติดตั้ง'); return { ready: true }; }
       progress('กำลังติดตั้งตัวรับเสียง…');
       await fs.mkdir(path.join(directory, 'runtime'), { recursive: true });
       // Archive is hash pinned. Pass paths as arguments, never concatenate user-controlled shell code.
@@ -79,7 +91,7 @@ function createListening({ directory, fetcher = fetch, runner = run }) {
         temp = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-voice-'));
         const wav = path.join(temp, 'input.wav'), out = path.join(temp, 'transcript');
         await fs.writeFile(wav, bytes);
-        await runner(executable, ['-m', modelPath(s.localModel), '-f', wav, '-l', 'th', '-otxt', '-of', out, '-nt', '-ng', '-t', '4', '--prompt', vocabulary.join(', ')], { windowsHide: true, signal: controller.signal, timeout: 120000, maxBuffer: 1024 * 1024 });
+        await runner(exe(), ['-m', modelPath(s.localModel), '-f', wav, '-l', 'th', '-otxt', '-of', out, '-nt', ...(MAC ? [] : ['-ng']), '-t', '4', '--prompt', vocabulary.join(', ')], { windowsHide: true, signal: controller.signal, timeout: 120000, maxBuffer: 1024 * 1024 });
         const text = (await fs.readFile(`${out}.txt`, 'utf8')).trim().slice(0, 4000);
         return resultText(text);
       }

@@ -69,7 +69,7 @@ test('local STT uses argument array, forces Thai, and deletes temporary recordin
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-local-test-')); let input;
   await fs.mkdir(path.join(directory, 'runtime', 'Release'), { recursive: true });
   await fs.writeFile(path.join(directory, 'ggml-small-q5_1.bin'), 'fixture'); await fs.writeFile(path.join(directory, 'runtime', 'Release', 'whisper-cli.exe'), 'fixture');
-  const service = createListening({ directory, runner: async (_exe, args, options) => {
+  const service = createListening({ directory, executable: path.join(directory, 'runtime', 'Release', 'whisper-cli.exe'), runner: async (_exe, args, options) => {
     assert.equal(options.windowsHide, true); assert.equal(args[args.indexOf('-l') + 1], 'th');
     input = args[args.indexOf('-f') + 1]; assert.ok(await fs.stat(input)); await fs.writeFile(`${args[args.indexOf('-of') + 1]}.txt`, 'ลุงเดฟ เปิดเพลง');
   } });
@@ -135,7 +135,7 @@ test('Thai medium is also used for wake-only audio without a network request', a
   await fs.mkdir(path.join(directory, 'runtime', 'Release'), { recursive: true });
   await fs.writeFile(path.join(directory, 'runtime', 'Release', 'whisper-cli.exe'), 'fixture');
   await fs.writeFile(path.join(directory, 'thonburian-medium-q5_0.bin'), 'fixture');
-  const service = createListening({ directory, fetcher: () => assert.fail('wake audio must stay local'), runner: async (_exe, args) => {
+  const service = createListening({ directory, executable: path.join(directory, 'runtime', 'Release', 'whisper-cli.exe'), fetcher: () => assert.fail('wake audio must stay local'), runner: async (_exe, args) => {
     assert.match(args[args.indexOf('-m') + 1], /thonburian-medium/); assert.match(args[args.indexOf('--prompt') + 1], /ลุงเดฟ/);
     await fs.writeFile(args[args.indexOf('-of') + 1] + '.txt', 'ลุงเดฟ');
   } });
@@ -163,4 +163,16 @@ test('wake plus command uses selected cloud transcriber only after local wake ma
   await v.process([]); assert.deepEqual(calls,[true,false]);assert.equal(sent,'เปิดเครื่องคิดเลข');
   calls.length=0;v.followUntil=0;v.pending=false;v.host.listeningTranscribe=async(_bytes,waking)=>{calls.push(waking);return {text:'เสียงที่ไม่เรียก'}};
   await v.process([]);assert.deepEqual(calls,[true]);
+});
+
+test('on macOS the model install downloads only the model (whisper-cli comes from Homebrew)', { skip: process.platform !== 'darwin' }, async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'uncle-install-mac-'));
+  const urls = [];
+  const service = createListening({ directory, executable: path.join(directory, 'whisper-cli'), fetcher: async (url) => { urls.push(url); return { ok: true, body: [Buffer.from('not the pinned file')] }; } });
+  await fs.writeFile(path.join(directory, 'whisper-cli'), 'fixture');
+  try {
+    await assert.rejects(service.install(() => {}, 'small'), /SHA256/);
+    assert.deepEqual(urls, ['https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin']);
+    assert.deepEqual(await fs.readdir(directory), ['whisper-cli']);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
