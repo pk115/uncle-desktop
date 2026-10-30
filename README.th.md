@@ -1,154 +1,293 @@
+<div align="center">
+
 # Uncle Desktop
 
-**รุ่น 0.7.0:** โหมดเสียงส่งคำสั่งเอง ถามยืนยันก่อนปิดโปรแกรม/เปิดรายการเสี่ยง รับคำตอบใช่–ไม่ใช่โดยไม่เรียกซ้ำ และยกเลิกเมื่อหมดเวลา 20 วินาที คำสั่งพื้นฐานใช้เครื่องมือจริงโดยตรง ดู [คู่มือเสียง](docs/VOICE_COMMANDS_TH.md)
-
-เพิ่มเสียงไทย Edge ชาย/หญิงพร้อมเลือกในโปรแกรม ไม่ต้องติดตั้งเสียง Windows หรือใส่คีย์ (ต้องใช้อินเทอร์เน็ต) พร้อมเก็บ Windows และ OpenAI ไว้ครบ ดู [บริการเสียงทั้งสามแบบ](docs/SPEECH_TH.md)
-
-**รุ่น 0.6.0:** เพิ่มกดพูด/รอคำเรียกที่ตั้งเอง เลือกไมค์ คุยต่อหลังปลุก ถอดเสียงไทยในเครื่องหรือ OpenAI ตรวจข้อความก่อนส่ง และคีย์ลัดปิดไมค์ ดู [วิธีใช้และข้อจำกัด](docs/VOICE_COMMANDS_TH.md) ไมค์ปิดเมื่อเริ่มโปรแกรมทุกครั้ง
-
-ดู [สถานะโค้ดปัจจุบันและแผนเพิ่มฟีเจอร์จาก lachydotmcg](docs/FEATURE_ROADMAP_TH.md): มีแชตและคำสั่งเปิดแอป/เพลง ตัวละคร และ TTS แล้ว; รุ่น 0.6.0 รับเสียงจากไมค์และตั้งคำเรียกได้แล้ว; งานค้างคือหน้าตั้งค่ารวม Screen Vision ที่มี preview ขยับปาก และ OpenCode Hub
-
-**รุ่น 0.5.0:** มีตัวติดตั้ง Windows และหน้า **เสียงพูดภาษาไทย…** ในเมนูคลิกขวา เลือกเสียง Windows หรือ OpenAI TTS พร้อมทดสอบ/หยุดเสียง ปรับความเร็วและระดับเสียง และอ่านแชตอัตโนมัติได้ เสียงไทย Windows ต้องติดตั้งเพิ่มหากยังไม่มี ส่วน OpenAI ต้องใช้คีย์และยินยอมส่งข้อความ โดยอาจมีค่าบริการ ดู [คู่มือและข้อจำกัดการทดสอบเสียง](docs/SPEECH_TH.md)
+**เพื่อน AI ตัวเล็กบนหน้าจอ ที่คุยภาษาไทยได้ ทำงานแทนคุณได้ และคอยดู Coding AI ให้**
 
 **ภาษาไทย** · [English](README.md) · [Français](README.fr.md) · [คู่มือต้นฉบับ Capri](README.upstream.md)
 
+[![Release](https://img.shields.io/github/v/release/pk115/uncle-desktop?label=ดาวน์โหลด)](https://github.com/pk115/uncle-desktop/releases/latest)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)
+![macOS](https://img.shields.io/badge/macOS-beta-black)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange)](LICENSE)
+
+<img src="docs/done.png" alt="Uncle Desktop บนหน้าจอ" width="560">
+
+</div>
+
 > [!NOTE]
-> **เครดิตผู้สร้างต้นฉบับ:** โปรเจกต์นี้พัฒนาและปรับแต่งต่อยอดมาจาก [Capri Desktop](https://github.com/mochiiwuff/capri-desktop) ของคุณ [mochiiwuff](https://github.com/mochiiwuff) โดยนำมาปรับปรุงให้รองรับภาษาไทย ปรับเปลี่ยนตัวละคร และเพิ่มฟีเจอร์สำหรับผู้ใช้งานชาวไทย
+> ต่อยอดจาก [Capri Desktop](https://github.com/mochiiwuff/capri-desktop) ของ [mochiiwuff](https://github.com/mochiiwuff) และได้แรงบันดาลใจหลายฟีเจอร์จาก [Capri ของ lachydotmcg](https://github.com/lachydotmcg/capri-desktop)
 
----
+## สารบัญ
 
-**Uncle Desktop** คือตัวละครคู่หู AI บนหน้าจอคอมพิวเตอร์ (AI Desktop Companion) ที่จะคอยติดตามและแสดงสถานะการทำงานของ Coding AI Agent ต่างๆ เช่น **Claude Code**, **Codex** และ **Antigravity (AGY)** พร้อมทั้งมีฟิสิกส์แอนิเมชันน่ารักๆ บนหน้าจอ รองรับภาษาไทยเต็มรูปแบบ และสามารถเปลี่ยนตัวละครได้
+- [ติดตั้ง](#ติดตั้ง)
+- [ฟีเจอร์ทั้งหมด](#ฟีเจอร์ทั้งหมด)
+  - [ตัวละคร](#-ตัวละคร)
+  - [ใช้ชีวิตบนหน้าจอ](#-ใช้ชีวิตบนหน้าจอ)
+  - [แชตและสมอง AI](#-แชตและสมอง-ai)
+  - [เสียงพูด](#-เสียงพูด)
+  - [สั่งงานด้วยเสียง](#-สั่งงานด้วยเสียง)
+  - [AI Agent ควบคุมเครื่อง](#-ai-agent-ควบคุมเครื่อง)
+  - [คำสั่งด่วนในแชต](#-คำสั่งด่วนในแชต)
+  - [เพลงและมินิเพลเยอร์](#-เพลงและมินิเพลเยอร์)
+  - [ติดตาม Coding AI](#-ติดตาม-coding-ai)
+  - [ตั้งค่าและระบบ](#-ตั้งค่าและระบบ)
+- [Windows กับ Mac ต่างกันตรงไหน](#windows-กับ-mac-ต่างกันตรงไหน)
+- [คีย์ลัด](#คีย์ลัด)
+- [ความเป็นส่วนตัวและความปลอดภัย](#ความเป็นส่วนตัวและความปลอดภัย)
+- [สำหรับนักพัฒนา](#สำหรับนักพัฒนา)
+- [ประวัติเวอร์ชัน](#ประวัติเวอร์ชัน)
+- [เครดิตและสัญญาอนุญาต](#เครดิตและสัญญาอนุญาต)
 
-![Uncle Desktop / Capri](docs/done.png)
+## ติดตั้ง
 
----
+| ระบบ | ไฟล์ | หมายเหตุ |
+|---|---|---|
+| Windows 10 / 11 | `Uncle-Desktop-Setup-x.y.z.exe` | ติดตั้งแล้วอัปเดตตัวเองอัตโนมัติ |
+| Mac ชิป M | `Uncle-Desktop-x.y.z-arm64.dmg` | ยังไม่ได้เซ็นกับ Apple ดู[วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md) |
+| Mac Intel | `Uncle-Desktop-x.y.z-x64.dmg` | เหมือนด้านบน |
 
-## 🎭 ตัวละครที่มีให้เลือกใช้งาน (Selectable Characters)
+ดาวน์โหลดได้ที่ **[หน้า Releases](https://github.com/pk115/uncle-desktop/releases/latest)** เปิดครั้งแรกจะมีหน้าตั้งค่าทีละขั้นพาเลือกตัวละคร เลือก AI เปิดเสียง และเชื่อม Coding AI
 
-สามารถคลิกขวาที่ตัวละครหรือถาดระบบ แล้วเลือก **"เลือกตัวละคร…"** ได้เลย มีให้เลือกถึง 13 คาแรคเตอร์ พร้อมรองรับการเพิ่มตัวละครของคุณเอง:
+## ฟีเจอร์ทั้งหมด
 
-| UncleDev (หนุ่มหัวร้อน) | Blacky (แมวดำ) | Mira (สาว AI) | Pinky (เสือชมพู) |
-| :---: | :---: | :---: | :---: |
-| <img src="assets/characters/angry-boy/portrait.png" width="120" /> | <img src="assets/characters/blacky/portrait.png" width="120" /> | <img src="assets/characters/mira/portrait.png" width="120" /> | <img src="assets/characters/pinky/portrait.png" width="120" /> |
+### 🎭 ตัวละคร
 
-| Bald Man (ลุงผมบาง) | Cute Girl | Drunk Uncle (ลุงขี้เมา) | Lazy Boy (หนุ่มขี้เซา) |
-| :---: | :---: | :---: | :---: |
-| <img src="assets/characters/bald-man/portrait.png" width="120" /> | <img src="assets/characters/cute-girl/portrait.png" width="120" /> | <img src="assets/characters/drunk-uncle/portrait.png" width="120" /> | <img src="assets/characters/lazy-boy/portrait.png" width="120" /> |
+มีให้เลือก 17 ตัว เลือกจากหน้าตั้งค่าแท็บ **ตัวละคร** ที่มีรูปตัวอย่าง หรือเปลี่ยนด่วนจากเมนูคลิกขวา
 
-| Chubby Girl | Fatty Girl | Angry Guy | Vulture |
-| :---: | :---: | :---: | :---: |
-| <img src="assets/characters/chubby-girl/portrait.png" width="120" /> | <img src="assets/characters/fatty-girl/portrait.png" width="120" /> | <img src="assets/characters/angry-guy/portrait.png" width="120" /> | <img src="assets/characters/vulture/portrait.png" width="120" /> |
+| UncleDev | Blacky | Mira | Pinky | Mochi | Lili |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| <img src="assets/characters/angry-boy/portrait.png" width="90"> | <img src="assets/characters/blacky/portrait.png" width="90"> | <img src="assets/characters/mira/portrait.png" width="90"> | <img src="assets/characters/pinky/portrait.png" width="90"> | <img src="assets/characters/mochi/portrait.png" width="90"> | <img src="assets/characters/lili/portrait.png" width="90"> |
+| **Luna** | **Pudding** | **Bald Man** | **Cute Girl** | **Drunk Uncle** | **Lazy Boy** |
+| <img src="assets/characters/luna/portrait.png" width="90"> | <img src="assets/characters/pudding/portrait.png" width="90"> | <img src="assets/characters/bald-man/portrait.png" width="90"> | <img src="assets/characters/cute-girl/portrait.png" width="90"> | <img src="assets/characters/drunk-uncle/portrait.png" width="90"> | <img src="assets/characters/lazy-boy/portrait.png" width="90"> |
+| **Chubby Girl** | **Fatty Girl** | **Angry Guy** | **Vulture** | **Capri** (ต้นฉบับ) | |
+| <img src="assets/characters/chubby-girl/portrait.png" width="90"> | <img src="assets/characters/fatty-girl/portrait.png" width="90"> | <img src="assets/characters/angry-guy/portrait.png" width="90"> | <img src="assets/characters/vulture/portrait.png" width="90"> | — | |
 
-*(และตัวละครดั้งเดิม **Capri** จาก Cyberpunk: Edgerunners)*  
-ดูรายละเอียดเพิ่มเติมและวิธีสร้างตัวละครของตัวเองได้ที่ [docs/CHARACTERS.md](docs/CHARACTERS.md) และ [docs/ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md)
+- แต่ละตัวมีบุคลิก คำพูด และท่าทางของตัวเอง
+- **มุมมอง:** เต็มตัว หรือครึ่งตัวให้เห็นหน้าชัด
+- **ขนาด:** ปรับได้หลายระดับ
+- **นำเข้าตัวละครเอง:** ใช้ภาพ atlas ของคุณ ดู [CHARACTERS.md](docs/CHARACTERS.md) และ [ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md)
 
----
+### 🏙 ใช้ชีวิตบนหน้าจอ
 
-## ฟีเจอร์เด่นใน Uncle Desktop
+- **นั่งบนหน้าต่าง:** นั่งห้อยขาบนขอบหน้าต่างโปรแกรม และตามไปเมื่อหน้าต่างขยับ
+- **ลากและขว้าง:** ลากไปวางได้ ขว้างได้ และตกตามแรงโน้มถ่วง
+- **เดินเล่นเมื่อว่าง:** เดินไปมาบนจอ แอบตามขอบจอ หรือขี่เคอร์เซอร์ของคุณ
+- **ตำแหน่งพัก:** เลือกได้ว่าจะพักที่มุมจอ หรือนั่งบน taskbar (บน Mac คือ Dock)
+- **หลายจอ:** รองรับหลายจอ เสียบจอใหม่หรือย้ายจอ ตัวละครก็รู้
+- **เก็บเข้าไบโอชิป:** กด Ctrl+Alt+C เพื่อเก็บตัวละครเป็นชิปเล็ก ๆ ที่มุมจอ
+- **หึง:** เวลาคุณเปิด ChatGPT, Gemini หรือ AI ตัวอื่นไว้หน้าสุด ตัวละครจะหึง
+- **ตอบสนองต่อเครื่อง:** ดูจอเองเป็นระยะ และพูดถึงสิ่งที่เห็นได้
+- **เอฟเฟกต์กับหน้าต่าง:** เล่นเอฟเฟกต์เข้าสิงหน้าต่างได้
+- **ค่าความสนิท (ซิงค์):** เพิ่มขึ้นเมื่อใช้งานด้วยกัน
 
-- **รองรับภาษาไทยเต็มรูปแบบ:**
-  - เมนูคลิกขวา, ถาดระบบ (System Tray), หน้าต่างการตั้งค่า และหน้าต่างแนะนำรองรับภาษาไทย
-  - มาพร้อมฟอนต์ภาษาไทย Chakra Petch สวยงามโดยไม่ต้องดาวน์โหลดเพิ่ม
-  - รองรับคำสั่งผ่านแชตภาษาไทย การแปลงเวลาและตัวเลขไทย; รุ่น 0.6.0 รับเสียงไมค์แบบกดพูด/คำเรียกได้ พร้อมอ่านคำตอบออกเสียง (ดู [คู่มือภาษาไทย](docs/THAI_SUPPORT.md) และ [คู่มือเสียง](docs/SPEECH_TH.md))
-- **เปลี่ยนและนำเข้าตัวละครได้ (Selectable Characters):**
-  - สลับตัวละครได้หลากหลาย หรือนำเข้าตัวละครใหม่ๆ ด้วยตัวเอง (ดู [docs/CHARACTERS.md](docs/CHARACTERS.md) และ [docs/ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md))
-- **ติดตามสถานะของ Coding AI แบบเรียลไทม์:**
-  - **Ticker:** แสดงสิ่งที่ AI กำลังทำอยู่ เช่น กำลังแก้โค้ด (`EDITS file.ts`), รันเทสต์ (`RUNS npm test`), ค้นหาไฟล์ (`GREPS`)
-  - **แจ้งเตือนเมื่อ AI ติดปัญหา / รอการอนุมัติ:** ตัวละครจะวาปมาข้างเคอร์เซอร์เมาส์ของคุณ พร้อมชี้ไปที่หน้าต่างของ AI ตัวนั้น
-  - **Thinking Indicator:** มีแอนิเมชันบอกสถานะเมื่อโมเดลกำลังใช้เวลาคิดนาน จะได้รู้ว่าไม่ได้ค้าง
-  - **Error & Victory:** แสดงเอฟเฟกต์กระแทกเวลารันคำสั่งล้มเหลว และเต้นฉลองพร้อมแสดงสรุปจำนวนงานเมื่อ AI ทำงานเสร็จ
-- **ฟิสิกส์และการโต้ตอบบนหน้าจอเดสก์ท็อป:**
-  - นั่งห้อยขาบนขอบหน้าต่างโปรแกรม และเลื่อนตามหน้าต่างที่ใช้งาน
-  - รองรับการคลิกลาก ขว้าง หรือปล่อยให้ตกตามแรงโน้มถ่วง
-  - โต้ตอบกับเมาส์ หลบเมาส์ แอบตามขอบจอ และรองรับการทำงานหลายหน้าจอ (Multi-monitor)
-- **แชตกับ AI & เครื่องมือช่วยเหลือ:**
-  - คุยกับ LLM (ทั้ง Local และ Cloud), แคปภาพหน้าจอ, ควบคุมเสียงในเครื่อง และตั้งนาฬิกาเตือนความจำ
+### 💬 แชตและสมอง AI
 
----
+- **AI ที่ใช้ได้:**
+  - Ollama ในเครื่อง ติดตั้งให้ผ่านหน้าตั้งค่าได้
+  - OpenAI, Gemini, Mistral, DeepSeek
+  - Pollinations ใช้ฟรี ไม่ต้องใส่คีย์
+  - เซิร์ฟเวอร์ที่ใช้ API แบบ OpenAI
+- **ระดับความฉลาด 3 ระดับ:** NORMAL (เร็ว ประหยัด), HIGHER (สมดุล), MAX INTELLIGENCE (ฉลาดสุด) เลือกโมเดลให้จากรายการของผู้ให้บริการ
+- **ความจำ:**
+  - `personality.md` คุณเขียนบุคลิกให้ตัวละครเอง
+  - `me.md` ตัวละครจดสิ่งที่รู้เกี่ยวกับคุณระหว่างคุย
+- **คีย์ API:** เข้ารหัสเก็บในเครื่องด้วยบัญชีผู้ใช้ของระบบ
+- **ภาษา:** ไทยเป็นหลัก รองรับอังกฤษ ฝรั่งเศส สเปน โปรตุเกส และรัสเซีย
 
-## การติดตั้งและเริ่มต้นใช้งาน
+### 🔊 เสียงพูด
 
-### สิ่งที่ต้องมีในเครื่อง
+| บริการ | ทำงานที่ไหน | ภาษาไทย | หมายเหตุ |
+|---|---|:-:|---|
+| เสียงของเครื่อง | ในเครื่อง | ✓ ถ้าติดตั้งเสียงไทยไว้ | Windows SAPI หรือคำสั่ง `say` ของ macOS |
+| Edge TTS | ออนไลน์ | ✓ | เปรมวดี / นิวัฒน์ ไม่ต้องใช้คีย์ |
+| **Kokoro** | **ในเครื่อง ฟรี** | ✗ | อังกฤษ ญี่ปุ่น จีน และอีกบางภาษา โหลดโมเดลประมาณ 90 MB ครั้งแรก |
+| OpenAI | ออนไลน์ | ✓ | ต้องใช้ API key |
+| ElevenLabs | ออนไลน์ | ✓ | โมเดล eleven_v3 ใส่ Voice ID ได้ |
+| Fish Audio | ออนไลน์ | ✓ | ใช้เสียงที่โคลนไว้ได้ |
+| เซิร์ฟเวอร์ของคุณ | ตามที่ตั้ง | ตามโมเดล | API แบบ OpenAI เช่น Kokoro-FastAPI หรือโมเดลของคุณเอง |
 
-- [Node.js](https://nodejs.org/) เวอร์ชั่น 20 ขึ้นไป
-- ระบบปฏิบัติการ Windows 10 หรือ 11
-- macOS (รุ่นทดลอง): ดาวน์โหลด `.dmg` แล้วทำตาม [วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md)
+- **ปรับเสียง:**
+  - Pitch สูงหรือต่ำ ±12 ครึ่งเสียง
+  - Robot เป็นเสียงหุ่นยนต์
+  - Glitch เสียงขาดเป็นช่วง ๆ
+  - ซ้อนเสียง เพิ่มเสียงตัวเองอีกสองชั้น สูงหนึ่ง ต่ำหนึ่ง
+- **อ่านคำตอบแชตอัตโนมัติ:** ตัวละครขยับปากตามเสียงพูด
 
-### วิธีติดตั้ง
+### 🎙 สั่งงานด้วยเสียง
+
+- **วิธีฟัง:** กดพูด (Ctrl+Alt+V) หรือรอคำเรียกที่ตั้งเอง เช่น "เฮ้ อังเคิล" ตรวจคำเรียกในเครื่อง
+- **ถอดเสียง:**
+  - Whisper ในเครื่อง: รุ่น small หรือ Thonburian medium ที่ฝึกมาสำหรับภาษาไทย
+  - Gemini หรือ OpenAI
+- **คุยต่อได้:** หลังเรียกแล้วพูดต่อได้ ระบบถามยืนยันก่อนทำเรื่องเสี่ยง และตอบ "ใช่" หรือ "ไม่" ด้วยเสียงได้
+- **ElevenLabs Voice Agent:** คุยต่อเนื่อง พูดแทรกได้ และเรียกเครื่องมือของแอปได้ 13 หมวด ดู [VOICE_AGENT_TH.md](docs/VOICE_AGENT_TH.md)
+- ไมค์ปิดทุกครั้งที่เปิดแอป จนกว่าคุณจะเปิดเอง ดู [VOICE_COMMANDS_TH.md](docs/VOICE_COMMANDS_TH.md)
+
+### 🤖 AI Agent ควบคุมเครื่อง
+
+สั่งงานหลายขั้นตอนเป็นภาษาพูด เช่น *"เปิด Notepad แล้วพิมพ์รายการซื้อของ"* AI อ่านหน้าต่าง วางแผน แล้วลงมือทีละขั้น สูงสุด 30 ขั้นต่องาน
+
+- **มองหน้าจอ:** อ่านปุ่ม ช่องกรอก และข้อความในหน้าต่าง (UI Automation บน Windows, Accessibility บน Mac) ถ้าอนุญาตจะดูภาพหน้าต่างด้วย
+- **ลงมือ:** คลิก ดับเบิลคลิก คลิกขวา ลาก พิมพ์ภาษาไทย กดคีย์ลัด เลื่อนหน้า สลับ ย่อ หรือปิดหน้าต่าง
+- **ทำงานยาวได้:**
+  - รอจนข้อความที่กำหนดขึ้นบนจอ
+  - จดค่าที่เห็นบนจอไว้ใช้ในขั้นถัดไป
+  - เปิดหลายแอปในงานเดียว
+- **เกม:** `hold_and_press` กดค้างปุ่มหนึ่งระหว่างกดอีกปุ่ม เช่น กด W ค้างแล้วกด Space
+- **หน้าเว็บ:** ปฏิเสธคุกกี้ ปิด popup ค้น Google เมื่อไม่รู้ และเลือกเพลงหรือวิดีโอเองเมื่อคุณสั่งกว้าง ๆ
+- **พูดแทรกได้:** พิมพ์หรือพูดระหว่างที่งานรันอยู่ ตัวละครตอบ "รับทราบ" แล้วเอาไปใช้ในขั้นถัดไป
+- **เคอร์เซอร์นีออน:** ลูกศรสีเขียวเลื่อนไปยังจุดที่จะคลิกก่อนคลิกจริง
+- **ตรวจผลก่อนบอกว่าเสร็จ:** ต้องเห็นหลักฐานบนจอ หรือมีโมเดลภาพตรวจซ้ำ
+- **หยุดได้ทุกเมื่อ:** กด Esc หรือ Ctrl+Alt+X
+
+**ความปลอดภัย 4 ระดับ + สวิตช์ 10 ตัว**
+
+| ระดับ | ทำอะไรเองได้ |
+|---|---|
+| **Lockdown** | อ่านหน้าจออย่างเดียว ไม่คลิก ไม่พิมพ์ |
+| **Guarded** (แนะนำ) | ถามก่อนทุกขั้นที่มีผล เช่น ส่ง บันทึก ลบ |
+| **Trusted** | ถามเฉพาะเรื่องเงิน ลบ ติดตั้ง และปิดเครื่อง |
+| **Blackwall** | ไม่ถามเลย ทำทุกขั้นเอง |
+
+ทุกระดับปรับต่อได้ด้วยสวิตช์ 10 ตัว ติ๊กคือทำเองโดยไม่ถาม:
+
+1. เปิดแอป เว็บ และเพลง
+2. คลิกตามตำแหน่งบนภาพ
+3. กดคีย์ลัด
+4. ปิดแอปและหน้าต่าง
+5. ปรับเสียงและสั่งเพลง
+6. ปิด รีสตาร์ท ล็อก พักเครื่อง
+7. กดค้าง ลาก และปุ่มเกม
+8. ส่ง โพสต์ บันทึก ยืนยัน
+9. ซื้อ จ่าย ลบ ติดตั้ง
+10. ส่งภาพหน้าต่างให้ AI
+
+> [!IMPORTANT]
+> ทุกระดับ **ไม่กรอกรหัสผ่านหรือเลขบัตร** และ**ไม่พิมพ์คำสั่งใน Terminal หรือ PowerShell** ดู [COMPUTER_CONTROL_TH.md](docs/COMPUTER_CONTROL_TH.md)
+
+### ⚡ คำสั่งด่วนในแชต
+
+สั่งได้ทันทีโดยไม่ต้องเริ่มงานหลายขั้นตอน
+
+- **เปิด:** แอป เกม Steam/Epic เว็บไซต์ และโฟลเดอร์ เช่น *"เปิด Discord, Spotify และ Steam"*
+- **ปิดแอป:** ถามยืนยันก่อน
+- **ค้นไฟล์:** ใช้ Windows Search หรือ Spotlight แล้วเปิดไฟล์หรือโฟลเดอร์ได้
+- **เพลง:** เปิดเพลงใน Spotify หรือ YouTube สั่งเล่น หยุด ข้ามเพลง ปรับเสียง
+- **ค้น Google และเปิดเกม Roblox**
+- **ตั้งเตือนความจำ:** เช่น *"อีก 20 นาทีเตือนให้กินข้าว"*
+- **แคปหน้าจอ และให้ดูหน้าจอ**
+
+### 🎵 เพลงและมินิเพลเยอร์
+
+- **มินิเพลเยอร์:** มุมขวาล่าง แสดงเพลงที่กำลังเล่นจาก Spotify, เบราว์เซอร์ หรือเครื่องเล่นใดก็ได้ที่ระบบรู้จัก มีปุ่ม ⏮ ⏯ ⏭
+- **เต้นตามเพลง:** ตัวละครเต้นระหว่างที่เพลงเล่น
+- เปิดหรือปิดได้ที่ ตั้งค่า › พฤติกรรม
+
+### 👨‍💻 ติดตาม Coding AI
+
+ต่อกับ **Claude Code**, **Codex** และ **Antigravity** ผ่าน hooks
+
+- **Ticker:** แสดงว่า AI กำลังทำอะไร เช่น `EDITS file.ts`, `RUNS npm test`
+- **รออนุมัติ:** ตัวละครวาปมาข้างเมาส์และชี้ไปที่หน้าต่างที่ต้องกด
+- **Thinking indicator:** ให้รู้ว่า AI กำลังคิดอยู่ ไม่ได้ค้าง
+- **เอฟเฟกต์:** กระแทกเมื่อคำสั่งล้มเหลว ฉลองพร้อมสรุปภารกิจเมื่อเสร็จ
+- **เรียก Claude Code หรือ Codex ผ่าน Ollama ในเครื่องได้**
+
+### ⚙ ตั้งค่าและระบบ
+
+- **ตั้งค่าครั้งแรก:** หน้าตั้งค่าทีละขั้น 6 ขั้น: ตัวละคร, AI, เสียงพูด, ไมค์, Coding AI, เสร็จ
+- **เมนูคลิกขวา:** สั้น มีแต่สิ่งที่ใช้ประจำ
+- **หน้าตั้งค่าแบบแท็บ:** 7 แท็บ ธีมไซเบอร์พังก์
+- **คีย์ลัด:** เปลี่ยนเองได้
+- **ล้างการตั้งค่าทั้งหมด:** มีปุ่มกดสองครั้งเพื่อยืนยัน
+- **อัปเดต:**
+  - ตัวละครบอกเมื่อมีเวอร์ชันใหม่
+  - Windows ติดตั้งให้เมื่อกดรีสตาร์ท
+  - Mac พาไปหน้าดาวน์โหลด
+- **เปิดอัตโนมัติตอนเข้าเครื่อง**
+- **บันทึกข้อผิดพลาด:** เขียนลง `errors.txt` แทนการเด้งหน้าต่าง error
+
+## Windows กับ Mac ต่างกันตรงไหน
+
+| เรื่อง | Windows | Mac |
+|---|---|---|
+| ติดตั้งและอัปเดต | อัปเดตเอง | ต้องดาวน์โหลดเอง (ยังไม่ได้เซ็นกับ Apple) |
+| ควบคุมเครื่อง | UI Automation | Accessibility (ต้องอนุญาตครั้งแรก) |
+| อ่านชื่อหน้าต่าง | ได้เลย | ต้องอนุญาต Screen Recording |
+| ถอดเสียงในเครื่อง | Whisper ที่แอปดาวน์โหลดให้ | whisper-cpp ผ่าน Homebrew ใช้ชิปกราฟิก |
+| ไอคอน | system tray | menu bar |
+| แจ้งเตือนตอนเสียบ USB | ✓ | ✗ |
+| รายชื่อเกม | Steam, Epic | Steam |
+
+## คีย์ลัด
+
+| คีย์ | ทำอะไร |
+|---|---|
+| `Ctrl+Alt+V` | เริ่มพูด หรือปิดไมค์ |
+| `Ctrl+Alt+M` | ปิดเสียง |
+| `Ctrl+Alt+C` | เก็บตัวละครเข้าไบโอชิป หรือเอาออกมา |
+| `Ctrl+Alt+X` | หยุดงานควบคุมเครื่อง |
+| `Esc` | หยุดงานที่กำลังทำ |
+
+เปลี่ยนได้ที่ ตั้งค่า › ระบบ › คีย์ลัด
+
+## ความเป็นส่วนตัวและความปลอดภัย
+
+- ไมค์ปิดทุกครั้งที่เปิดแอป
+- คำเรียกตรวจในเครื่อง
+- บริการออนไลน์ทุกตัวต้องติ๊กยินยอมก่อนใช้
+- คีย์ API เข้ารหัสด้วยบัญชีผู้ใช้ของเครื่อง ไม่ส่งให้หน้าเว็บและไม่บันทึกลง log
+- งานควบคุมเครื่องส่งเฉพาะข้อมูลของงานนั้นให้ AI ไม่เก็บภาพลงไฟล์ และงดส่งภาพเมื่อเจอช่องรหัสผ่าน
+- ข้อความบนหน้าจอถือเป็นข้อมูล ไม่ใช่คำสั่ง: AI ไม่ทำตามข้อความที่เขียนบนเว็บ
+
+## สำหรับนักพัฒนา
+
+ต้องมี [Node.js](https://nodejs.org/) 20 ขึ้นไป
 
 ```bash
-# Clone โปรเจกต์
 git clone https://github.com/pk115/uncle-desktop.git
 cd uncle-desktop
-
-# ติดตั้งแพ็กเกจที่จำเป็น
 npm install
-
-# เริ่มเปิดใช้งานโปรแกรม
 npm start
 ```
 
-### คำสั่งสคริปต์ต่างๆ
+| คำสั่ง | ทำอะไร |
+|---|---|
+| `npm run dev` | เปิดแอปพร้อม DevTools และ debug bridge |
+| `npm test` | รันชุดทดสอบทั้งหมด |
+| `npm run demo` | เล่นแอนิเมชันตัวอย่าง |
+| `npm run hooks:install` | ติดตั้ง hooks ของ Claude Code |
+| `npm run hooks:codex:install` | ติดตั้ง hooks ของ Codex |
+| `npm run hooks:agy:install` | ติดตั้ง hooks ของ Antigravity |
+| `npm run dist` | build ตัวติดตั้ง Windows |
+| `npm run dist:mac` | build `.dmg` บน Mac (รวมตัวควบคุมเครื่องที่เขียนด้วย Swift) |
+| `npm run release` | build แล้วอัปโหลดขึ้น GitHub Release แบบ draft (ต้องมี `GH_TOKEN`) |
 
-- `npm run dev` — เปิดใช้งานพร้อมเปิด DevTools
-- `npm run demo` — ทดสอบรันแอนิเมชันของตัวละคร
-- `npm test` — รันชุดทดสอบความถูกต้องและภาษาไทย
-- `npm run hooks:agy:install` — ติดตั้ง Hook สำหรับ Antigravity (AGY)
-- `npm run hooks:codex:install` — ติดตั้ง Hook สำหรับ Codex
-- `npm run hooks:install` — ติดตั้ง Hook สำหรับ Claude Code
-- `npm run dist` — Build โปรแกรมสำหรับติดตั้งบน Windows (NSIS Installer)
-- `npm run release` — Build แล้วอัปโหลดตัวติดตั้งขึ้น GitHub Release แบบ draft (ต้องตั้ง `GH_TOKEN`) กด Publish แล้วเครื่องที่ติดตั้งไว้จะอัปเดตเอง
+พอเผยแพร่ release แล้ว GitHub Actions จะ build และแนบไฟล์ `.dmg` ของ Mac ให้เอง
 
----
+## ประวัติเวอร์ชัน
 
-## สิทธิ์การใช้งานและเครดิต (License & Credits)
+| เวอร์ชัน | สิ่งที่เพิ่ม |
+|---|---|
+| **0.17.0** | ระดับความฉลาด 3 ระดับ, เสียง Kokoro ฟรีในเครื่อง + ElevenLabs + Fish + เซิร์ฟเวอร์ของคุณ, ปรับเสียง (pitch, robot, glitch, ซ้อนเสียง), สวิตช์ความปลอดภัย 10 ตัว, มินิเพลเยอร์และเต้นตามเพลง |
+| 0.16.0 | ความปลอดภัย 4 ระดับ, พูดแทรกระหว่างทำงาน, เปิดหลายแอปในประโยคเดียว, ปุ่มเกม, เคอร์เซอร์นีออน |
+| 0.15.0 | ฟีเจอร์ Windows บน Mac: ควบคุมเครื่อง, ถอดเสียงในเครื่อง, นั่งบนหน้าต่าง, สั่งเพลง |
+| 0.14.0 | ตัว Mac รุ่นแรก (ชิป M และ Intel) |
+| 0.13.0 | หน้าตั้งค่าทีละขั้น, หน้าตั้งค่าแบบแท็บ, เมนูคลิกขวาสั้นลง, ล้างการตั้งค่า, แจ้งอัปเดต |
+| 0.12.2 | หน้าตั้งค่ารวม, คีย์ลัดเปลี่ยนเองได้, personality.md / me.md, มุมมองครึ่งตัว, errors.txt |
+| 0.12.0 | ตัวละครใหม่ Mochi, Lili, Luna, Pudding |
+| 0.11.0 | ElevenLabs Voice Agent |
+| 0.9.0 | ควบคุมเครื่องหลายขั้นตอน (Windows) |
+| 0.8.x | ถอดเสียงไทย Thonburian, Gemini และอัปเดตอัตโนมัติ |
+| 0.5.0 – 0.7.0 | ตัวติดตั้ง Windows, เสียงพูดไทย, สั่งงานด้วยเสียง, คำเรียก |
 
-- ต่อยอดมาจาก [mochiiwuff/capri-desktop](https://github.com/mochiiwuff/capri-desktop) (ผู้พัฒนาต้นฉบับ: mochiiwuff)
+รายละเอียดแต่ละรุ่นอยู่ที่ [หน้า Releases](https://github.com/pk115/uncle-desktop/releases)
+
+## เครดิตและสัญญาอนุญาต
+
+- ต่อยอดจาก [mochiiwuff/capri-desktop](https://github.com/mochiiwuff/capri-desktop) ของ mochiiwuff
+- หลายฟีเจอร์ได้แรงบันดาลใจจาก [lachydotmcg/capri-desktop](https://github.com/lachydotmcg/capri-desktop)
 - พัฒนาและดูแลต่อโดย **TheUncleDev** ([pk115/uncle-desktop](https://github.com/pk115/uncle-desktop))
-- ใช้งานภายใต้สัญญาอนุญาต [PolyForm Noncommercial 1.0.0](LICENSE)
-
-
-
-### 0.8.0 — Thai speech recognition
-
-Local Thai-tuned Thonburian medium, Gemini transcription, configurable pause duration and vocabulary, and a no-action voice test with model/timing diagnostics. See [Thai voice guide](docs/VOICE_COMMANDS_TH.md).
-
-### 0.8.1 — อัปเดตตัวเอง และขยับตามเสียงพูด
-
-โปรแกรมที่ติดตั้งแล้วจะเช็กรุ่นใหม่จาก GitHub Releases ตอนเปิดและทุก 6 ชั่วโมง ดาวน์โหลดเงียบๆ แล้วติดตั้งตอนปิดโปรแกรม และตัวละครจะขยับตามเสียงขณะอ่านคำตอบ ติดตั้ง 0.8.1 ด้วยมือครั้งเดียว รุ่นถัดไปจะมาเอง
-
-
-### 0.9.0 — Computer control (Windows)
-
-Read UI Automation targets, type Thai, click, scroll and run bounded multi-step jobs with the selected AI. Includes step status, confirmations, stop hotkey and observed-text completion checks. See [computer control guide](docs/COMPUTER_CONTROL_TH.md). Inspired by the [Capri project by Lachy](https://github.com/lachydotmcg/capri-desktop).
-
-
-### 0.11.0 — Switchable ElevenLabs Voice Agent
-
-Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous voice with interruption handling and 13 client-tool categories. Thai uses Eleven v3 Conversational. See [Thai setup and validation guide](docs/VOICE_AGENT_TH.md).
-
-
-### 0.12.0 — Four new companions
-
-Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.
-
-
-### 0.16.0 — Agent ที่เก่งขึ้น
-
-ความปลอดภัย 4 ระดับสำหรับควบคุมเครื่อง (Lockdown, Guarded, Trusted, Blackwall), พูดแทรกระหว่างทำงานได้, เปิดหลายแอปในประโยคเดียว, ปุ่มสำหรับเกม (กดค้างปุ่มหนึ่งแล้วกดอีกปุ่ม) และเคอร์เซอร์นีออนของตัวละครที่แสดงว่ากำลังจะคลิกตรงไหน ทั้ง Windows และ Mac
-
-### 0.15.0 — ฟีเจอร์ Windows บน Mac
-
-บน macOS ตัวละครนั่งบนหน้าต่างได้, ควบคุมเครื่องได้ (Accessibility), ใช้โมเดลรับเสียงในเครื่อง (whisper-cpp ผ่าน Homebrew ใช้ชิปกราฟิก), เล่น/หยุดเพลงใน Spotify หรือ Music และเห็นเกม Steam ดูสิทธิ์ที่ต้องอนุญาตใน[วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md)
-
-### 0.14.0 — macOS (รุ่นทดลอง)
-
-ตัวแรกสำหรับ Mac (ชิป M และ Intel): ตัวละครอยู่ทุก Space, ไอคอนที่ menu bar, เสียงพูดของ macOS, Ollama, ค้นไฟล์ด้วย Spotlight, ปิดแอปและปรับเสียง ยังไม่ได้เซ็นกับ Apple ดู[วิธีติดตั้งบน Mac](docs/INSTALL_MAC_TH.md) ส่วนควบคุมเครื่อง โมเดลรับเสียงในเครื่อง และติดตามหน้าต่าง ยังใช้ได้เฉพาะ Windows
-
-### 0.13.0 — ตั้งค่าทีละขั้นและหน้าตั้งค่าแบบแท็บ
-
-หน้าตั้งค่าทีละขั้นตอนเปิดครั้งแรก, เมนูคลิกขวาสั้นลง ที่เหลือย้ายไปหน้าตั้งค่าแบบแท็บ (มีตัวอย่างตัวละคร), ปุ่มล้างการตั้งค่าทั้งหมด และตัวละครบอกเมื่อมีอัปเดตพร้อมปุ่มรีสตาร์ท กับปุ่มเช็คอัปเดตในหน้าตั้งค่า
-
-### 0.12.2 — ตั้งค่ารวม ความจำ และแก้บั๊ก
-
-หน้าตั้งค่ารวมพร้อมคีย์ลัดที่เปลี่ยนเองได้, personality.md ที่เขียนบุคลิกเอง และ me.md ที่จดสิ่งที่รู้เกี่ยวกับคุณระหว่างคุย, มุมมองครึ่งตัว, บันทึกข้อผิดพลาดลง errors.txt และแก้ปุ่มดาวน์โหลดโมเดลในเครื่องที่ใช้ไม่ได้ตั้งแต่ 0.8.0
+- โมเดลเสียง: [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), [whisper.cpp](https://github.com/ggml-org/whisper.cpp), [Thonburian Whisper](docs/THONBURIAN_LICENSE.md)
+- สัญญาอนุญาต [PolyForm Noncommercial 1.0.0](LICENSE)
