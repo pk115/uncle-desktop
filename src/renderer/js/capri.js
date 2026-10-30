@@ -416,7 +416,7 @@ export class Capri {
     this.lastDraw = now;
     this.animate(now);
     const reaction = now < (this.reactionUntil || 0) ? this.reaction : '';
-    this.sprite.draw(this.p, { mode: this.mode, act: this.act?.player.name, reaction });
+    this.sprite.draw(this.p, { mode: this.mode, act: this.act?.player.name, reaction, talk: this.talk?.() || 0 });
     this.place();
   }
 

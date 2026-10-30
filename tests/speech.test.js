@@ -49,3 +49,16 @@ test('spoken chat removes code blocks, links and formatting, and limits long rep
   assert.equal(speechText('**สวัสดี** [อ่านต่อ](https://example.com) ```js\nsecret()\n```'), 'สวัสดี อ่านต่อ');
   assert.equal(speechText('x'.repeat(3000)).length, 2000);
 });
+
+test('mouth levels stay shut on silence and open with loudness, whatever the voice volume', async () => {
+  const { mouthLevels } = await import(pathToFileURL(path.join(__dirname, '../src/renderer/js/speech.js')).href);
+  const rate = 1200, step = rate / 12;
+  const voice = (gain) => Float32Array.from({ length: step * 12 }, (_, i) => (i < step * 2 ? 0 : gain * (Math.floor(i / step) / 12) * Math.sin(i)));
+  const loud = mouthLevels(voice(0.9), rate), soft = mouthLevels(voice(0.1), rate);
+  assert.equal(loud.length, 12);
+  assert.deepEqual(loud.slice(0, 2), [0, 0]);
+  assert.equal(loud.at(-1), 1);
+  assert.ok(loud.slice(2).every((level, i, all) => i === 0 || level >= all[i - 1]));
+  assert.deepEqual(soft, loud);
+  assert.deepEqual(mouthLevels(new Float32Array(rate), rate), new Array(12).fill(0));
+});
