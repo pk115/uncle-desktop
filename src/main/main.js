@@ -909,6 +909,7 @@ function registerIpc() {
   });
   ipcMain.handle('computer:answer', (_e, value) => {if(!value||typeof value.jobId!=='string'||typeof value.approvalId!=='string')throw new Error('คำยืนยันต้องตรงกับขั้นตอนปัจจุบัน');return computer.answer(value);});
   ipcMain.on('computer:stop', () => computer.stop());
+  ipcMain.handle('computer:tell', (_e, text) => computer.tell(text));
 
 
   voiceAgentAPI=voiceAgent.createAgentAPI({getSettings:()=>config.load().voiceAgent,getKey:()=>setup.openKeys(config.load().apiKeys).elevenlabs||process.env.ELEVENLABS_API_KEY,save:value=>updateConfig({voiceAgent:value})});

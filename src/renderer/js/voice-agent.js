@@ -68,6 +68,7 @@ export class VoiceAgent {
   if(!user)return;
   if(/^(หยุดงาน|ยกเลิกงาน|stop|cancel)[.!\s]*$/i.test(event.message)){this.host.computerStop();return;}
   if(this.pending&&event.message!==this.injected)await this.answer(event.message);
+  else if(this.computer.state?.status==='running'&&event.message!==this.injected)this.host.computerTell(event.message).catch(()=>{});
  }
  ask(state){
   if(!this.active)return false;this.pending={...state};

@@ -61,3 +61,12 @@ test('security levels: trusted asks only for risky steps, blackwall never',()=>{
  const computer=createComputer({native:{request:async()=>({}),stop(){}},decide:async()=>''});
  assert.throws(()=>computer.start({task:'x',consent:true,security:'yolo'}));
 });
+test('what you say mid-job reaches her next step',async()=>{
+ const view={app:{window:1,process:'notepad',title:'Notepad'},targets:[{id:1,role:'Document',name:'Text',value:'hi there'}]};
+ let calls=0,seen=null,c;
+ c=createComputer({native:{request:async a=>a.action==='windows'?[]:view,stop(){}},decide:async({history})=>{calls++;if(calls===1){c.tell('also say bye');return JSON.stringify({tool:'wait',reason:'wait',seconds:0.05});}seen=history;return JSON.stringify({tool:'done',reason:'ok',evidence:'hi there'});}});
+ assert.equal(c.tell('nobody working'),false);
+ c.start({task:'type hi',consent:true});
+ for(let i=0;i<50&&c.busy;i++)await new Promise(r=>setTimeout(r,50));
+ assert.ok(seen.some(h=>h.user==='also say bye'));
+});

@@ -274,6 +274,7 @@ export class Chat {
 
   async send(text) {
     if (this.turn || !this.open) return;
+    if(this.onJobTell&&await this.onJobTell(text))return; // a job running: what you type goes to her hands
     const job=computerTask(text);
     if(job&&this.onComputer){await this.onComputer(job,{voice:false});return;}
     const id = Date.now();

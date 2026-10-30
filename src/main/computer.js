@@ -122,6 +122,7 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
       let view=await native.request({action:'read',window:0},signal);await native.request({action:'focus',window:view.app.window},signal);
       for(let i=0;i<30;i++){
         if(signal.aborted||job!==current)return;
+        for(const said of current.inbox.splice(0))history.push({user:said,note:'said mid-job: follow it, it may change or add to the job'});
         emit(current,{status:'running',message:'กำลังอ่านหน้าต่างและวางขั้นตอนถัดไป…'});
         view=await native.request({action:'read',window:0},signal);const windows=await native.request({action:'windows'},signal);
         const image=current.images&&!view.targets.some(t=>t.secret)?await picture?.(view,signal):null;
@@ -178,8 +179,10 @@ function createComputer({native,decide,openApp,openSite,picture,system,verifyVis
   }
   function start({task,consent,images=false,voice=false,directAction=null,readOnly=false,security='guarded'}){
     if(job)throw new Error('มีงานกำลังทำอยู่');if(typeof task!=='string'||!task.trim()||task.length>2000||consent!==true||typeof images!=='boolean'||typeof voice!=='boolean'||!SECURITY.includes(security))throw new Error('ระบุงานและอนุญาตอ่านหน้าจอก่อนเริ่ม');
-    const current={task:task.trim(),images,readOnly:readOnly||security==='lockdown',security,directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
+    const current={task:task.trim(),inbox:[],images,readOnly:readOnly||security==='lockdown',security,directAction:directAction?actionFrom(JSON.stringify(directAction)):null,controller:new AbortController(),state:{id:randomUUID(),voice,status:'running',steps:[],message:'เริ่มงาน…'}};job=current;current.deadline=setTimeout(()=>{if(job===current)stop();},600000);emit(current,{});run(current);return current.state.id;
   }
-  return{start,stop,answer,get busy(){return Boolean(job);}};
+  // something you say while she works: she says got it and takes it into her next step
+  function tell(text){if(typeof text!=='string'||!text.trim()||text.length>1000)throw new Error('ข้อความไม่ถูกต้อง');if(!job)return false;job.inbox.push(text.trim());emit(job,{message:'รับทราบ: '+text.trim()});return true;}
+  return{start,stop,answer,tell,get busy(){return Boolean(job);}};
 }
 module.exports={createNative,createComputer,actionFrom,needsConfirmation,SHORTCUTS,SECURITY};

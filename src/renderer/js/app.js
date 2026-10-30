@@ -340,7 +340,10 @@ async function boot() {
   listeningUI.realtime=new VoiceAgent({host,listening:listeningUI,speech:speechUI,computer:computerUI});
   listeningUI.realtime.configure(config);
   chat.onComputer = (text,options) => computerUI.request(text,options);
-  listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
+  // a job running: you can talk to her mid-job (not to answer a question she asked: that's its buttons)
+  const tellJob = (text) => ['running'].includes(computerUI.state?.status) ? host.computerTell(text).catch(() => false) : false;
+  chat.onJobTell = tellJob;
+  listeningUI.onJobControl=async text=>{if(/^(?:หยุด(?:งาน|ทำงาน)?|ยกเลิก(?:งาน)?|stop|cancel)[.!\s]*$/i.test(text)){host.computerStop();speechUI.stop();}else if(await tellJob(text))listeningUI.setStatus('รับทราบ: '+text);else listeningUI.setStatus('กำลังทำงานอยู่ — พูดหยุดงานเพื่อยกเลิก');};
   chat.onReply = (text) => { if (listeningUI.submitting) listeningUI.speakFeedback(text); else speechUI.reply(text); };
   chat.onSpeechStop = () => { speechUI.stop(); listeningUI.stop(); };
   brain.onTalk = () => chat.start();
