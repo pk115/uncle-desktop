@@ -23,6 +23,20 @@ const { createMcp } = require('./mcp');
 const { chatWithTools } = require('./tool-chat');
 const { createAssistant, MAIL_QUERY } = require('./assistant');
 let personal = null; // Gmail and Calendar through MCP, and their alerts
+const { createJobs } = require('./jobs');
+const jobs = createJobs({ log: (line) => console.log(line) }); // her background jobs (news, briefs…)
+const notifiers = []; // where her alerts go besides her bubble (Telegram)
+// an alert for you: her bubble, and every other way you've set up
+function notifyUser(alert) {
+  sendCommand('assistant-alert', alert);
+  for (const send of notifiers) Promise.resolve().then(() => send(alert)).catch((err) => console.log(`[notify] ${err.message}`));
+}
+// a background job's AI: its own model (models by task), no streaming, read-only by design (no tools)
+async function backgroundAI(system, content, signal = AbortSignal.timeout(120000)) {
+  const cfg = config.load();
+  if (cfg.provider === 'claude') throw new Error('งานเบื้องหลังใช้ Claude Code ไม่ได้ เลือก AI อื่นในแท็บ AI แชต');
+  return chatWithFallback({ ...cfg, chatModel: modelFor('background', cfg) }, [{ role: 'system', content: system }, { role: 'user', content }], () => {}, signal, () => false);
+}
 let mcp = null; // her MCP servers (userData/mcp.json), connected once she's ready
 const mcpAsks = new Map(); // a tool waiting for your yes: id -> resolve
 const { createSystemTools } = require('./computer-system');
@@ -1550,7 +1564,7 @@ function main() {
     watchMusic();
     mcp = createMcp({ file: path.join(app.getPath('userData'), 'mcp.json'), version: app.getVersion(), log: (line) => console.log(line) });
     mcp.start().then(() => rebuildTray()).catch(() => {});
-    personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: (a) => sendCommand('assistant-alert', a), log: (line) => console.log(line) });
+    personal = createAssistant({ mcp, dir: path.join(app.getPath('userData'), 'mcp'), getConfig: () => config.load(), alert: notifyUser, log: (line) => console.log(line) });
     personal.start();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
