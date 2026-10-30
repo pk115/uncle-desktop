@@ -75,6 +75,94 @@ function saveMemory(patch, characterId) {
     console.error('[capri] could not save her memory:', err.message);
   }
 }
+// Two files she reads before she answers, open in Notepad from her settings: personality.md (how you
+// want her) and me.md (what she knows of you, which she also adds to herself, see learnAboutUser).
+// Lines starting with # are notes for you, not for her.
+const NOTES = {
+  personality: { file: 'personality.md', template: '# บุคลิกของตัวละคร: เขียนว่าอยากให้เป็นแบบไหน เช่น พูดสุภาพ เรียกฉันว่าพี่ ชอบแซวเรื่องกาแฟ\n# บรรทัดที่ขึ้นต้นด้วย # จะไม่ถูกส่งให้ AI\n\n' },
+  me: { file: 'me.md', template: '# สิ่งที่ตัวละครรู้เกี่ยวกับคุณ: เธอเพิ่มบรรทัดใหม่เองหลังคุยกัน แก้หรือลบได้ตามใจ\n# บรรทัดที่ขึ้นต้นด้วย # จะไม่ถูกส่งให้ AI\n\n' },
+};
+const NOTES_MAX = 4000; // characters of each sent with every message
+const notesFile = (name) => path.join(app.getPath('userData'), NOTES[name].file);
+function readNotes(name) {
+  try {
+    const text = fs.readFileSync(notesFile(name), 'utf8').split(/\r?\n/).filter((line) => !line.startsWith('#')).join('\n').trim();
+    return name === 'me' ? text.slice(-NOTES_MAX) : text.slice(0, NOTES_MAX); // what she learned last counts most
+  } catch {
+    return '';
+  }
+}
+function openNotes(name) {
+  const file = notesFile(name);
+  if (!fs.existsSync(file)) fs.writeFileSync(file, NOTES[name].template);
+  // Notepad, not the .md association: often none on Windows
+  require('node:child_process').spawn('notepad.exe', [file], { detached: true, stdio: 'ignore' }).on('error', () => shell.showItemInFolder(file)).unref();
+  return '';
+}
+
+// Every few exchanges, her AI is asked what lasting things it learned about you, added to me.md.
+// Not with Claude Code: its chat is one session, a side question would land in it.
+const LEARN_EVERY = 5; // exchanges
+let unlearned = 0;
+async function learnAboutUser(history) {
+  const cfg = config.load();
+  if (!cfg.learn || cfg.provider === 'claude') return;
+  const talk = history.slice(-LEARN_EVERY * 2)
+    .filter((m) => typeof m?.content === 'string' && ['user', 'assistant'].includes(m.role))
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 1000)}`).join('\n');
+  if (!talk) return;
+  const known = readNotes('me');
+  const messages = [
+    { role: 'system', content: 'You keep long-term notes about a user for their desktop companion. From the conversation, write only NEW lasting facts about the user worth remembering for weeks: name, preferences, work, projects, people, plans, habits. One short fact per line, each starting with "- ", in the language of the conversation. Never note passwords, keys, money details or anything else secret. Skip what the notes already say. If there is nothing new, answer exactly NONE.' },
+    { role: 'user', content: `Notes so far:\n${known || '(none)'}\n\nConversation:\n${talk}` },
+  ];
+  try {
+    const text = await chatWithFallback(cfg, messages, () => {}, AbortSignal.timeout(90000), () => false);
+    const facts = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^- \S/.test(line) && !known.includes(line.slice(2))).slice(0, 5);
+    if (!facts.length) return;
+    const file = notesFile('me');
+    if (!fs.existsSync(file)) fs.writeFileSync(file, NOTES.me.template);
+    fs.appendFileSync(file, `${facts.join('\n')}\n`);
+  } catch (err) {
+    console.warn('[uncle] could not learn from the chat:', err.message);
+  }
+}
+
+// Her shortcuts (her settings): the keys are config.hotkeys, '' for none.
+const HOTKEY_ACTIONS = {
+  toggle: () => toggleVisible(),
+  voice: () => sendCommand('listening-toggle'),
+  mute: () => { listening?.stop(); sendCommand('listening-stop'); },
+};
+const hotkeys = () => ({ ...config.DEFAULTS.hotkeys, ...config.load().hotkeys });
+// Registered again from scratch; returns the actions whose keys another app holds (or that aren't keys).
+function registerHotkeys() {
+  globalShortcut.unregisterAll();
+  const keys = hotkeys();
+  return Object.keys(HOTKEY_ACTIONS).filter((name) => {
+    if (!keys[name]) return false;
+    try {
+      return !globalShortcut.register(keys[name], HOTKEY_ACTIONS[name]);
+    } catch {
+      return true;
+    }
+  });
+}
+function saveHotkeys(patch = {}) {
+  const keys = Object.fromEntries(Object.keys(HOTKEY_ACTIONS).map((name) => [name, typeof patch[name] === 'string' ? patch[name].slice(0, 60) : hotkeys()[name]]));
+  const used = Object.values(keys).filter(Boolean);
+  if (new Set(used).size !== used.length) throw new Error('คีย์ลัดซ้ำกัน ใช้ปุ่มเดียวกันกับสองคำสั่งไม่ได้');
+  const before = hotkeys();
+  config.save({ hotkeys: keys });
+  const taken = registerHotkeys();
+  if (taken.length) { // put back what worked before rather than leave them dead
+    config.save({ hotkeys: before });
+    registerHotkeys();
+  }
+  rebuildTray();
+  return { hotkeys: hotkeys(), taken };
+}
+
 function forgetChats() {
   llm.resetClaude();
   saveMemory({ history: [], claude: null });
@@ -361,6 +449,7 @@ function rebuildTray() {
     { label: t.help, click: () => sendCommand('welcome') },
     ...(cfg.claude ? [{ label: t.report, click: () => sendCommand('report') }] : []),
     { label: t.talk, click: () => sendCommand('chat') },
+    { label: resolveLang(cfg.lang) === 'th' ? 'ตั้งค่าทั้งหมด…' : 'All settings…', click: () => sendCommand('settings') },
     { label: resolveLang(cfg.lang) === 'th' ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
     { label: 'สั่งงานด้วยเสียง / ตั้งคำเรียก…', click: () => sendCommand('listening') },
     { label: 'ปิดไมโครโฟนทันที', click: () => { listening?.stop(); sendCommand('listening-stop'); } },
@@ -384,7 +473,7 @@ function rebuildTray() {
         click: () => updateConfig({ characterId: character.id }),
       })),
     },
-    { label: cfg.visible ? t.hide : t.show, accelerator: 'Ctrl+Alt+C', click: () => toggleVisible() },
+    { label: cfg.visible ? t.hide : t.show, accelerator: hotkeys().toggle || undefined, click: () => toggleVisible() },
     { type: 'separator' },
     {
       label: t.size,
@@ -876,8 +965,16 @@ function registerIpc() {
     return { local: llm.isLocal(cfg.provider, cfg, model), provider, model };
   });
   ipcMain.handle('chat:memory', () => readMemory().history || []);
+  ipcMain.handle('notes:get', () => ({ personality: readNotes('personality'), me: readNotes('me') }));
+  ipcMain.handle('notes:open', (_e, name) => (name in NOTES ? openNotes(name) : 'unknown notes'));
+  ipcMain.handle('hotkeys:save', (_e, patch) => saveHotkeys(patch));
   ipcMain.on('chat:remember', (_e, { history, characterId } = {}) => {
-    if (Array.isArray(history) && CHARACTERS.some((c) => c.id === characterId)) saveMemory({ history }, characterId);
+    if (!Array.isArray(history) || !CHARACTERS.some((c) => c.id === characterId)) return;
+    saveMemory({ history }, characterId);
+    if (++unlearned >= LEARN_EVERY) {
+      unlearned = 0;
+      learnAboutUser(history);
+    }
   });
   ipcMain.on('chat:ollama', () => shell.openExternal(OLLAMA_SITE));
   // setting her up with buttons (setup.js): Ollama and a model, or a key, or an address
@@ -1160,10 +1257,8 @@ function main() {
       onEvent: (evt) => !llm.isChatSession(evt.session_id) && overlay?.webContents.send('claude:event', evt),
       onDebug: DEV ? debugHandler : null,
     });
-    globalShortcut.register('Control+Alt+C', () => toggleVisible());
-    const voiceKey = globalShortcut.register('Control+Alt+V', () => sendCommand('listening-toggle'));
-    const muteKey = globalShortcut.register('Control+Alt+M', () => { listening?.stop(); sendCommand('listening-stop'); });
-    if (!voiceKey || !muteKey) console.warn('[uncle] Voice shortcut unavailable; use the voice window or tray menu');
+    const taken = registerHotkeys();
+    if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
     // Installed copies update from GitHub Releases: downloaded quietly, installed when she quits.
     if (app.isPackaged) {
       const { autoUpdater } = require('electron-updater');

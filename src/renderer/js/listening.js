@@ -8,7 +8,7 @@ export class Listening {
     root.className = 'character-picker';
     const box = el('div'); box.className = 'character-picker__box speech-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'สั่งงานด้วยเสียง');
     const close = el('button', '✕'); close.className = 'speech-close'; close.setAttribute('aria-label', 'ปิดหน้าต่าง'); close.onclick = () => this.hide();
-    box.append(el('h1', 'สั่งงานด้วยเสียง'), close, el('p', 'Ctrl+Alt+V กดเริ่ม/หยุดพูด · Ctrl+Alt+M ปิดไมค์ทันที · เปิดไมค์ใหม่เองทุกครั้งหลังเริ่มโปรแกรม'));
+    box.append(el('h1', 'สั่งงานด้วยเสียง'), close, el('p', 'Ctrl+Alt+V กดเริ่ม/หยุดพูด · Ctrl+Alt+M ปิดไมค์ทันที (เปลี่ยนได้ใน ตั้งค่าทั้งหมด) · เปิดไมค์ใหม่เองทุกครั้งหลังเริ่มโปรแกรม'));
     const field = (label, node) => { const wrap = el('label', label); wrap.append(node); box.append(wrap); return node; };
     const select = (options) => { const n = el('select'); for (const [value, label] of options) { const o = el('option', label); o.value = value; n.append(o); } return n; };
     this.mode = field('วิธีฟัง', select([['push', 'กดพูด — กดเริ่ม / หยุด'], ['wake', 'รอคำเรียก — ตรวจคำเรียกในเครื่อง']]));
