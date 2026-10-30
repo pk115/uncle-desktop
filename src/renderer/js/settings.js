@@ -87,6 +87,7 @@ export class Settings {
     const group = this.groups.find((g) => g.id === id) || this.groups[0];
     const h = el('h1', group.title); h.id = 'settings-title';
     this.panel.replaceChildren(h);
+    if (id === 'appearance') { this.cfg = await this.host.getConfig(); this.panel.append(this.characterGrid(() => this.tab(id))); }
     this.items(group.items, this.panel);
     if (id === 'system') this.more();
     this.tabs.querySelector('[aria-current]')?.focus();
@@ -176,15 +177,7 @@ export class Settings {
 
   character() {
     this.page('เลือกตัวละครของคุณ', 'คลิกตัวที่ชอบ เปลี่ยนได้ทุกเมื่อจากเมนูคลิกขวา');
-    const grid = el('div', '', 'wizard-characters');
-    for (const c of this.cfg.characters || []) {
-      const card = button('', async () => { this.cfg = await this.host.setConfig({ characterId: c.id }); this.go(this.step); }, 'wizard-character');
-      if (c.id === this.cfg.characterId) card.setAttribute('aria-pressed', 'true');
-      const img = el('img'); img.src = this.portrait(c); img.alt = '';
-      card.append(img, el('span', c.nameTh || c.name));
-      grid.append(card);
-    }
-    this.body.append(grid);
+    this.body.append(this.characterGrid(() => this.go(this.step)));
     const view = el('div', '', 'wizard-row');
     for (const [framing, label] of [['full', 'เต็มตัว'], ['bust', 'ครึ่งตัว · เห็นหน้าชัด']]) {
       const b = button(label, async () => { this.cfg = await this.host.setConfig({ characterFraming: framing }); this.go(this.step); });
@@ -193,6 +186,19 @@ export class Settings {
     }
     this.body.append(view, button('นำเข้าตัวละครของคุณเอง…', () => { this.hide(); this.onOpen('characters'); }, 'wizard-link'));
     this.footer('ใช้ตัวนี้ ไปต่อ');
+  }
+
+  // her characters as picture cards; picking one saves it, then calls then()
+  characterGrid(then) {
+    const grid = el('div', '', 'wizard-characters');
+    for (const c of this.cfg.characters || []) {
+      const card = button('', async () => { this.cfg = await this.host.setConfig({ characterId: c.id }); then(); }, 'wizard-character');
+      if (c.id === this.cfg.characterId) card.setAttribute('aria-pressed', 'true');
+      const img = el('img'); img.src = this.portrait(c); img.alt = '';
+      card.append(img, el('span', c.nameTh || c.name));
+      grid.append(card);
+    }
+    return grid;
   }
 
   ai() {
