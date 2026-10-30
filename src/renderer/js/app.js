@@ -297,6 +297,7 @@ async function boot() {
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || listeningUI?.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
   });
   speechUI.configure(config);
+  capri.talk = () => speechUI.level();
   listeningUI = new Listening({ host, root: document.getElementById('listening-settings'), indicator: document.getElementById('listening-stop'), speech: speechUI, chat,
     onWake: () => { capri.wake(); if (capri.mode !== 'alert') capri.perform('curious', capri.towardCenter()); },
     onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },

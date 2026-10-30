@@ -1,4 +1,4 @@
-import { clamp, reducedMotion } from './util.js';
+import { clamp, lerp, reducedMotion } from './util.js';
 import { SpriteRenderer, SPRITE as CAPRI } from './sprite.js';
 
 // Use one coordinate system for drawing, dragging, collision and effect anchors.
@@ -7,6 +7,16 @@ export const SPRITE = {
   head: { x: 160, y: 110 }, feet: { x: 160, y: 418 }, hip: 270,
   shoulder: { x: 120, y: 220 }, hand: { x: 35, y: 250 }, mirror: 320,
 };
+
+// While she talks: a small stretch up from her feet, eased toward the loudness (no atlas has mouth frames).
+function talkStretch(ctx, renderer, talk = 0) {
+  renderer.talk = reducedMotion.matches ? 0 : lerp(renderer.talk || 0, talk, 0.5);
+  if (renderer.talk < 0.01) return;
+  const x = SPRITE.pad + SPRITE.feet.x, y = SPRITE.pad + SPRITE.feet.y;
+  ctx.translate(x, y);
+  ctx.scale(1 - renderer.talk * 0.015, 1 + renderer.talk * 0.03);
+  ctx.translate(-x, -y);
+}
 
 export const ANIMATION_ROWS = Object.freeze({ idle: 0, thinking: 1, attention: 2, success: 3, error: 4, sleep: 5 });
 
@@ -84,6 +94,7 @@ export class CharacterRenderer {
     ctx.save();
     const scale = this.scale * (window.devicePixelRatio || 1);
     ctx.scale(scale, scale);
+    talkStretch(ctx, this, context.talk);
     ctx.globalAlpha = clamp((p.alpha ?? 1) * (1 - (p.dissolve || 0)), 0, 1);
     ctx.translate(SPRITE.pad + SPRITE.width / 2, SPRITE.pad);
     ctx.scale(Math.max(0.01, 1 - (p.collapse || 0)), 1);
@@ -128,6 +139,7 @@ class CapriRenderer {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const scale = this.scale * (window.devicePixelRatio || 1);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    talkStretch(ctx, this, context?.talk);
     ctx.drawImage(this.source, SPRITE.feet.x - CAPRI.feet.x, 0, CAPRI.width + CAPRI.pad * 2, CAPRI.height + CAPRI.pad * 2);
   }
 

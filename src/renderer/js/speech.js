@@ -2,6 +2,24 @@ export function speechText(text) {
   return String(text || '').replace(/```[\s\S]*?```/g, ' ').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/https?:\/\/\S+/g, '').replace(/[*#`_>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 2000);
 }
 
+// How loud her voice is, MOUTH_RATE times a second, 0 to 1: RMS per step, cut at the 35/70/97% quantiles of the
+// voiced steps so a quiet voice moves as much as a loud one (after lachydotmcg's Voice.Mouths).
+const MOUTH_RATE = 12;
+export function mouthLevels(samples, rate, perSecond = MOUTH_RATE) {
+  const step = Math.max(1, Math.floor(rate / perSecond));
+  const levels = [];
+  for (let i = 0; i + step <= samples.length; i += step) {
+    let sum = 0;
+    for (let j = i; j < i + step; j++) sum += samples[j] * samples[j];
+    levels.push(Math.sqrt(sum / step));
+  }
+  const quiet = Math.max(0.004, Math.max(0, ...levels) * 0.08);
+  const voiced = levels.filter((level) => level > quiet).sort((a, b) => a - b);
+  const cut = (q) => voiced[Math.min(voiced.length - 1, Math.floor(q * voiced.length))] ?? 1;
+  const [low, mid, high] = [cut(0.35), cut(0.7), cut(0.97)];
+  return levels.map((level) => (level <= quiet ? 0 : level < low ? 0.35 : level < mid ? 0.6 : level < high ? 0.85 : 1));
+}
+
 const node = (tag, text = '') => { const el = document.createElement(tag); el.textContent = text; return el; };
 export class Speech {
   constructor({ host, root, stopButton, onVisibility, lastReply }) {
@@ -121,9 +139,12 @@ export class Speech {
       this.source.buffer = buffer; this.gain.gain.value = this.settings.volume;
       this.source.connect(this.gain).connect(this.context.destination);
       this.source.onended = () => { if (serial === this.serial) { this.stopButton.hidden = true; this.status.textContent = 'อ่านจบแล้ว'; this.source = null; } };
-      this.source.start(); this.status.textContent = 'กำลังอ่าน…';
+      this.mouths = mouthLevels(buffer.getChannelData(0), buffer.sampleRate);
+      this.source.start(); this.startedAt = this.context.currentTime; this.status.textContent = 'กำลังอ่าน…';
     } catch (error) { if (serial === this.serial) { this.stopButton.hidden = true; throw error; } }
   }
+  // her voice's loudness right now, 0 to 1, for her mouth
+  level() { return this.source && this.mouths ? this.mouths[Math.floor((this.context.currentTime - this.startedAt) * MOUTH_RATE)] ?? 0 : 0; }
   stop() { const active = this.source || !this.stopButton.hidden; this.serial++; this.lastError = false; this.host.speechStop(); if (this.source) { this.source.onended = null; this.source.stop(); this.source = null; } this.stopButton.hidden = true; if (active) this.status.textContent = 'หยุดเสียงแล้ว'; }
   reply(text) { if (this.settings.auto) this.play(text).catch((error) => { this.error(error); if (!this.open) { this.lastError = true; this.stopButton.textContent = 'เสียงพูดไม่พร้อม — เปิดตั้งค่า'; this.stopButton.hidden = false; } }); }
 }
