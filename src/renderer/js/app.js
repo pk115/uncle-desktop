@@ -778,6 +778,13 @@ async function boot() {
     if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
+    if (cmd.name === 'telegram-pin') { // the PIN your phone adds to risky commands (/pr 1234)
+      const got = await guide.askText({ face: 'look', line: 'ตั้ง PIN 4–8 หลัก', quote: 'ใช้ต่อท้ายคำสั่งเสี่ยงจาก Telegram เช่น /pr 1234 · เก็บแบบแฮช ไม่เก็บตัวเลขจริง', secret: true, placeholder: '1234' });
+      if (!got?.text) return;
+      try { await host.telegramPin(got.text.trim()); panel.say({ kind: 'info', line: 'ตั้ง PIN แล้ว', hold: 5000 }); }
+      catch (err) { panel.say({ kind: 'error', line: err.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''), hold: 8000 }); }
+      return;
+    }
     if (cmd.name === 'telegram-token') { // her Telegram bot's token, pasted in her panel
       const got = await guide.askText({ face: 'look', line: 'วาง bot token จาก @BotFather', quote: 'หน้าตาแบบ 123456789:AA… · ฉันเก็บแบบเข้ารหัสในเครื่อง', secret: true, placeholder: '123456789:AA…' });
       if (!got?.text) return;

@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('host', {
   computerTell: text => ipcRenderer.invoke('computer:tell', text),
   mcpAnswer: (id, yes) => ipcRenderer.send('mcp:answer', { id, yes: Boolean(yes) }),
   telegramToken: (token) => ipcRenderer.invoke('telegram:token', token),
+  telegramPin: (pin) => ipcRenderer.invoke('telegram:pin', pin),
   onRpc: (handler) => ipcRenderer.on('rpc', (_e, call) => handler(call)),
   rpcReply: (reply) => ipcRenderer.send('rpc:reply', reply),
   onComputerState: on('computer:state'),

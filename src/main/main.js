@@ -26,6 +26,11 @@ let personal = null; // Gmail and Calendar through MCP, and their alerts
 const { createJobs } = require('./jobs');
 const { createTelegram } = require('./telegram');
 const { createPhone } = require('./phone');
+const { createVibe } = require('./vibe');
+const crypto = require('node:crypto');
+const VIBE_TOKEN = crypto.randomBytes(24).toString('hex'); // only her own Vibecode jobs may ask for approvals
+let vibe = null; // Vibecode: projects and their coding agents, run from your phone
+const pinHash = (pin) => crypto.createHash('sha256').update(`uncle:${pin}`).digest('hex');
 let telegram = null, phone = null; // your phone, through her Telegram bot
 // her Telegram settings, with what's off by default
 const PHONE_SWITCHES = { chat: true, approve: true, screen: false, control: false, power: false };
@@ -750,6 +755,10 @@ function rebuildTray() {
         { type: 'separator' },
         sw('chat', th ? 'คุยและถามข้อมูลจากมือถือ' : 'Chat from your phone'),
         sw('approve', th ? 'อนุมัติงานจากมือถือ (ส่งเมล สร้างนัด…)' : 'Approve from your phone (send mail, events…)'),
+        { type: 'separator' },
+        { label: s.pin ? (th ? 'เปลี่ยน PIN…' : 'Change PIN…') : (th ? 'ตั้ง PIN (สำหรับคำสั่งเสี่ยงจากมือถือ)…' : 'Set a PIN (for risky commands)…'), click: () => sendCommand('telegram-pin') },
+        { label: `Vibecode: ${config.load().vibe?.workspace || path.join(app.getPath('home'), 'vibe-projects')}`.slice(0, 90), enabled: false },
+        { label: th ? 'เลือกโฟลเดอร์โปรเจกต์ Vibecode…' : 'Choose the Vibecode folder…', click: async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] }); if (!r.canceled && r.filePaths[0]) updateConfig({ vibe: { ...config.load().vibe, workspace: r.filePaths[0] } }); } },
       ];
     })() },
     { id: 'agents', title: 'Coding AI', items: [
@@ -859,8 +868,19 @@ function startPhone() {
     onMessage: (m) => phone.onMessage(m),
     log: (line) => console.log(line),
   });
+  const workspace = config.load().vibe?.workspace || path.join(app.getPath('home'), 'vibe-projects');
+  vibe = createVibe({
+    getSettings: () => ({ workspace: config.load().vibe?.workspace || workspace }),
+    getState: (name) => config.load().vibe?.projects?.[name],
+    saveState: (name, state) => { const v = config.load().vibe || {}; updateConfig({ vibe: { ...v, projects: { ...v.projects, [name]: state } } }); },
+    approveScript: path.join(ROOT, 'hooks', 'uncle-approve-mcp.js').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`),
+    port: PORT, token: VIBE_TOKEN, log: (line) => console.log(line),
+  });
+  const coding = { ...vibe, shot: shotPage };
   phone = createPhone({
-    telegram, settings: phoneSettings, answer: phoneAnswer, idleSeconds: () => powerMonitor.getSystemIdleTime(),
+    telegram, settings: () => ({ ...phoneSettings(), project: config.load().vibe?.project || null }), answer: phoneAnswer, coding,
+    setProject: (project) => updateConfig({ vibe: { ...config.load().vibe, project } }),
+    checkPin: (pin) => Boolean(phoneSettings().pin) && /^\d{4,8}$/.test(pin) && pinHash(pin) === phoneSettings().pin, idleSeconds: () => powerMonitor.getSystemIdleTime(),
     transcribe: async (wav) => {
       const s = config.load().listening, keys = setup.openKeys(config.load().apiKeys);
       return (await listening.transcribe(wav, s, listeningSettings(s).provider === 'gemini' ? keys.gemini || process.env.GEMINI_API_KEY : keys.openai || process.env.OPENAI_API_KEY)).text;
@@ -880,6 +900,29 @@ function startPhone() {
   telegram.start();
 }
 const phoneNotify = (alert) => phone?.notify(alert);
+// a page of your project, as a picture: only this computer's own addresses (a dev server)
+async function shotPage(url) {
+  const address = new URL(/^https?:\/\//.test(url) ? url : `http://${url}`);
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(address.hostname)) throw new Error('ดูได้เฉพาะหน้าเว็บในเครื่อง (localhost)');
+  const win = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { sandbox: true, javascript: true } });
+  try {
+    await win.loadURL(address.toString());
+    await new Promise((r) => setTimeout(r, 1500));
+    return (await win.webContents.capturePage()).toPNG();
+  } finally { win.destroy(); }
+}
+// a Vibecode tool that needs permission: your phone, else her bubble; no answer in 10 minutes is no
+function approveForVibe({ tool_name: tool, input = {}, project } = {}, token) {
+  if (token !== VIBE_TOKEN || typeof tool !== 'string') return Promise.resolve(false);
+  const args = typeof input === 'object' && input ? input : {};
+  if (phone && phoneSettings().chatId) return phone.confirm(phoneSettings().chatId, { server: project || 'code', name: tool }, args);
+  return new Promise((resolve) => {
+    const ask = randomUUID();
+    mcpAsks.set(ask, resolve);
+    sendCommand('mcp-confirm', { id: ask, tool: `${project}/${tool}`, detail: JSON.stringify(args).slice(0, 200) });
+    setTimeout(() => { if (mcpAsks.delete(ask)) resolve(false); }, 10 * 60000);
+  });
+}
 async function setTelegramToken(token) {
   token = String(token || '').trim();
   if (!/^\d{5,}:[\w-]{30,}$/.test(token)) throw new Error('bot token ไม่ถูกต้อง (หน้าตาแบบ 123456789:AA…)');
@@ -1320,6 +1363,7 @@ function registerIpc() {
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
   ipcMain.on('rpc:reply', (_e, { id, ok, value, error } = {}) => { const call = rendererCalls.get(id); if (!call) return; rendererCalls.delete(id); ok ? call.resolve(value) : call.reject(new Error(error || 'ทำไม่สำเร็จ')); });
   ipcMain.handle('telegram:token', (_e, token) => setTelegramToken(token));
+  ipcMain.handle('telegram:pin', (_e, pin) => { if (!/^\d{4,8}$/.test(String(pin))) throw new Error('PIN ต้องเป็นตัวเลข 4–8 หลัก'); savePhone({ pin: pinHash(pin) }); return true; });
   ipcMain.on('mcp:answer', (_e, { id, yes } = {}) => { const resolve = mcpAsks.get(id); if (resolve) { mcpAsks.delete(id); resolve(yes === true); } });
   // she looks at your screen (look.js): the picture first, then what her AI says about it
   ipcMain.handle('look:snap', async () => {
@@ -1647,8 +1691,15 @@ function main() {
     createBridge({
       port: PORT,
       // her own Claude Code chat's hooks would cover its answer with theirs
-      onEvent: (evt) => !llm.isChatSession(evt.session_id) && overlay?.webContents.send('claude:event', evt),
+      onEvent: (evt) => {
+        if (llm.isChatSession(evt.session_id)) return;
+        overlay?.webContents.send('claude:event', evt);
+        const where = path.basename(evt.cwd || '') || 'Claude Code';
+        if (evt.hook_event_name === 'Notification') phone?.notify({ kind: 'agent', message: `${where}: ${evt.message || 'รอคุณอยู่'}` });
+        if (evt.hook_event_name === 'Stop' && !vibe?.projects().includes(where)) phone?.notify({ kind: 'agent', message: `${where}: ทำงานเสร็จแล้ว` });
+      },
       onDebug: DEV ? debugHandler : null,
+      onApprove: approveForVibe,
     });
     const taken = registerHotkeys();
     if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
