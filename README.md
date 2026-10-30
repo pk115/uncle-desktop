@@ -119,3 +119,8 @@ Choose the original Local/Gemini/OpenAI voice pipeline or ElevenLabs continuous 
 ### 0.12.0 — Four new companions
 
 Adds Mochi (pink gothic cat), Lili (anime floral elf), Luna (realistic floral elf), and Pudding (cheerful yellow casual outfit), with gallery previews, distinct personalities and six 2D pose states. Existing characters remain available.
+
+
+### 0.12.2 — Settings, memory and fixes
+
+One all-settings page with rebindable hotkeys, a personality.md you write and a me.md she fills in as you chat, an upper-body view, crash logging to errors.txt, and a working local model download button (broken since 0.8.0).
