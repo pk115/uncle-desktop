@@ -51,6 +51,7 @@ protocol.registerSchemesAsPrivileged([
 let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
+let updater = null; // electron-updater, installed copies only
 let settingsGroups = []; // the settings rebuildTray lays out, for her settings dialog's tabs
 let settingsClicks = []; // their handlers, by the id menu:groups gave each
 let demoTimer = null;
@@ -999,6 +1000,12 @@ function registerIpc() {
   ipcMain.handle('hooks:status', () => activeHooks().status());
   ipcMain.handle('config:set', (_e, patch) => updateConfig(patch));
   // "Reset all settings": defaults and no keys; the overlay reloads into her first-run setup
+  ipcMain.handle('update:check', async () => {
+    if (!updater) return { version: app.getVersion(), latest: null };
+    const r = await updater.checkForUpdates();
+    return { version: app.getVersion(), latest: r?.updateInfo?.version || null };
+  });
+  ipcMain.handle('update:install', () => updater?.quitAndInstall());
   ipcMain.handle('config:reset', () => {
     speech.stop(); listening?.stop(); computer?.stop(); voiceAgentAPI?.stop(); voiceAgentSession = null;
     config.reset();
@@ -1388,10 +1395,11 @@ function main() {
     });
     const taken = registerHotkeys();
     if (taken.length) console.warn('[uncle] shortcuts taken by another app:', taken.join(', '));
-    // Installed copies update from GitHub Releases: downloaded quietly, installed when she quits.
+    // Installed copies update from GitHub Releases: downloaded quietly, she tells you, installed now or when she quits.
     if (app.isPackaged) {
-      const { autoUpdater } = require('electron-updater');
-      const checkUpdate = () => autoUpdater.checkForUpdatesAndNotify().catch((err) => console.warn('[uncle] update check failed:', err.message));
+      updater = require('electron-updater').autoUpdater;
+      updater.on('update-downloaded', (info) => sendCommand('update', { version: info.version }));
+      const checkUpdate = () => updater.checkForUpdates().catch((err) => console.warn('[uncle] update check failed:', err.message));
       checkUpdate();
       setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
     }

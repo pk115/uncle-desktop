@@ -895,6 +895,14 @@ async function boot() {
         if (capri.stance === 'peek') await capri.unpeek();
         if (!capri.gaze({ big: true })) setTimeout(() => capri.gaze({ big: true }), 1500);
         break;
+      case 'update': // a new version downloaded (main.js): now, or when she quits
+        panel.say({
+          kind: 'info', face: 'smug', hold: null,
+          line: brain.lang === 'th' ? `มีเวอร์ชันใหม่ ${cmd.version} แล้วนะ โหลดเสร็จแล้ว` : `Version ${cmd.version} is ready.`,
+          actions: [{ id: 'now', label: brain.lang === 'th' ? 'รีสตาร์ทเพื่ออัปเดต' : 'Restart to update', primary: true }, { id: 'later', label: brain.lang === 'th' ? 'ไว้ทีหลัง' : 'Later' }],
+          onAction: (id) => (id === 'now' ? host.installUpdate() : panel.hide()),
+        });
+        break;
       case 'hooks':
         if (cmd.ok) panel.say({ kind: 'info', line: cmd.action === 'install' ? t.hooksOk : t.hooksRemoved, hold: 6000 });
         else panel.say({ kind: 'error', line: fmt(t.hooksFail, { error: cmd.error }), hold: 9000 });

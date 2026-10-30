@@ -324,6 +324,17 @@ export class Settings {
     more.append(button('ควบคุมเครื่อง…', () => { this.hide(); this.onOpen('computer'); }), button('ชื่อเล่นและความจำสั้น…', () => { this.hide(); this.onOpen('customize'); }));
     this.panel.append(more);
 
+    const updateNote = el('p', 'ตรวจอัตโนมัติทุก 6 ชั่วโมง เจอแล้วโหลดให้เอง แล้วตัวละครจะบอกคุณ');
+    const check = button('เช็คอัปเดตตอนนี้', async () => {
+      check.disabled = true; updateNote.textContent = 'กำลังเช็ค…';
+      try {
+        const { version, latest } = await this.host.checkUpdate();
+        updateNote.textContent = !latest ? `เวอร์ชัน ${version} · เช็คได้เฉพาะตัวที่ติดตั้งจาก installer`
+          : latest === version ? `เวอร์ชัน ${version} · ล่าสุดแล้ว` : `เวอร์ชัน ${version} · เจอ ${latest} กำลังดาวน์โหลด เสร็จแล้วตัวละครจะบอก`;
+      } catch (err) { updateNote.textContent = `เช็คไม่สำเร็จ: ${err.message}`; }
+      check.disabled = false;
+    });
+    this.panel.append(el('h2', 'อัปเดต'), updateNote, check);
     this.panel.append(el('h2', 'ล้างการตั้งค่าทั้งหมด'), el('p', 'คืนทุกอย่างเป็นค่าเริ่มต้นและลบ API key ที่บันทึกไว้ แล้วเริ่มตั้งค่าทีละขั้นใหม่ ไม่ลบโมเดลเสียงที่ดาวน์โหลดแล้ว ตัวละครที่นำเข้า ประวัติสนทนา และไฟล์ personality.md / me.md'));
     const reset = button('ล้างการตั้งค่าทั้งหมด…', () => {
       if (reset.dataset.armed) return this.host.resetConfig().catch((e) => this.error(e));
