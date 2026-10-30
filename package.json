@@ -75,6 +75,7 @@
     "asarUnpack": [
       "hooks/**",
       "src/main/windows.ps1",
+      "src/main/windows.jxa",
       "src/main/speech.ps1",
       "src/main/computer.ps1",
       "src/main/computer-native.cs",

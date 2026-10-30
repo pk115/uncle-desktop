@@ -1,6 +1,6 @@
 'use strict';
 
-// Feeds the overlay with the position of the other windows (Windows only), so Capri can
+// Feeds the overlay with the position of the other windows (Windows; macOS through windows.jxa), so Capri can
 // sit on them. A small PowerShell helper does the Win32 calls; we turn its physical pixels
 // into the overlay's coordinates. It also says when the window in front is another AI (ChatGPT,
 // Gemini…: `ai`, the names it matched), for her jealousy, and never passes on a title; which game
@@ -13,10 +13,12 @@ const { spawn } = require('node:child_process');
 const { screen } = require('electron');
 
 // in the installed app it sits next to the app archive (asarUnpack), where PowerShell can read it
-const SCRIPT = path.join(__dirname, 'windows.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+const unpacked = (file) => path.join(__dirname, file).replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+const SCRIPT = unpacked('windows.ps1');
+const MAC = process.platform === 'darwin';
 
 function startWindowWatch({ overlay, onUpdate }) {
-  if (process.platform !== 'win32') return { stop() {}, refresh() {} };
+  if (process.platform !== 'win32' && !MAC) return { stop() {}, refresh() {} };
 
   let child = null;
   let stopped = false;
@@ -24,10 +26,11 @@ function startWindowWatch({ overlay, onUpdate }) {
   let last = null; // the helper's last snapshot: it only speaks when something changes
 
   const handle = overlay.getNativeWindowHandle();
-  const self = handle.length >= 8 ? handle.readBigUInt64LE(0) : BigInt(handle.readUInt32LE(0));
+  const self = MAC ? 0n : handle.length >= 8 ? handle.readBigUInt64LE(0) : BigInt(handle.readUInt32LE(0));
 
   const toOverlay = (win, bounds) => {
-    const dip = screen.screenToDipRect(null, { x: win.x, y: win.y, width: win.w, height: win.h });
+    // a Mac's window list is already in points, Electron's own units
+    const dip = MAC ? { x: win.x, y: win.y, width: win.w, height: win.h } : screen.screenToDipRect(null, { x: win.x, y: win.y, width: win.w, height: win.h });
     return { id: win.id, x: dip.x - bounds.x, y: dip.y - bounds.y, w: dip.width, h: dip.height, max: win.max };
   };
 
@@ -46,10 +49,12 @@ function startWindowWatch({ overlay, onUpdate }) {
   };
 
   const start = () => {
-    child = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-      '-File', SCRIPT, String(self), String(process.pid),
-    ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    child = MAC
+      ? spawn('osascript', ['-l', 'JavaScript', unpacked('windows.jxa'), String(process.pid)], { stdio: ['ignore', 'pipe', 'pipe'] })
+      : spawn('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', SCRIPT, String(self), String(process.pid),
+      ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
     readline.createInterface({ input: child.stdout }).on('line', (line) => {
       try {

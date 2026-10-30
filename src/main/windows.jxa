@@ -1,0 +1,52 @@
+// macOS twin of windows.ps1: prints one JSON line whenever the windows change, for her to sit on.
+// CGWindowList gives the windows front first, in points (Electron's own units on a Mac), without
+// any permission. Titles only come with Screen Recording allowed; without it the AI check uses
+// the app's name. No titles go out, only which AI matched.
+//
+//   osascript -l JavaScript windows.jxa <her pid>
+ObjC.import('CoreGraphics');
+ObjC.import('AppKit');
+
+const AIS = [
+  ['chatgpt', /\bChatGPT\b/i], ['claude', /\bClaude\b/i], ['codex', /\bCodex\b/i], ['gemini', /\bGemini\b/i],
+  ['copilot', /\bCopilot\b/i], ['perplexity', /\bPerplexity\b/i], ['deepseek', /\bDeepSeek\b/i], ['grok', /\bGrok\b/i],
+  ['lechat', /\bLe Chat\b|\bMistral AI\b/i], ['characterai', /character\.ai/i], ['metaai', /\bMeta AI\b/i],
+];
+const GAME = /\/steamapps\/common\/([^/]+)\//i;
+const out = $.NSFileHandle.fileHandleWithStandardOutput;
+
+function snapshot(self) {
+  // 1: on screen only, 16: not the desktop
+  const list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1 | 16, 0))) || [];
+  const front = $.NSWorkspace.sharedWorkspace.frontmostApplication;
+  const frontPid = front.isNil() ? -1 : front.processIdentifier;
+  const frontPath = front.isNil() || front.executableURL.isNil() ? '' : ObjC.unwrap(front.executableURL.path);
+  let fg = 0, ai = [];
+  const wins = [];
+  for (const w of list) {
+    if (w.kCGWindowLayer !== 0 || w.kCGWindowOwnerPID === self || (w.kCGWindowAlpha ?? 1) === 0) continue;
+    const b = w.kCGWindowBounds;
+    if (!fg && w.kCGWindowOwnerPID === frontPid) {
+      fg = w.kCGWindowNumber;
+      const text = `${w.kCGWindowName || ''} ${w.kCGWindowOwnerName || ''}`;
+      ai = AIS.filter(([, re]) => re.test(text)).map(([key]) => key);
+    }
+    if (b.Width < 200 || b.Height < 120 || wins.length >= 40) continue;
+    wins.push({ id: w.kCGWindowNumber, x: b.X, y: b.Y, w: b.Width, h: b.Height, max: false });
+  }
+  const game = GAME.exec(frontPath)?.[1] || null;
+  return JSON.stringify({ fg, taskbar: false, ai, game, usb: [], plug: null, wins });
+}
+
+function run(argv) {
+  const self = Number(argv[0]) || 0;
+  let last = '';
+  for (;;) {
+    const snap = snapshot(self);
+    if (snap !== last) {
+      last = snap;
+      out.writeData($(`${snap}\n`).dataUsingEncoding($.NSUTF8StringEncoding)); // her end closed: this ends us
+    }
+    delay(0.4);
+  }
+}
