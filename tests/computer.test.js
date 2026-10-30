@@ -75,3 +75,12 @@ test('hold_and_press: two real keys, asks first when guarded',()=>{
  assert.throws(()=>actionFrom(JSON.stringify({tool:'hold_and_press',reason:'x',hold:'W'})));
  assert.ok(needsConfirmation({tool:'hold_and_press',hold:'W',text:'SPACE'},{targets:[]}));
 });
+test('switches: each one lets her skip asking for its own kind of step',()=>{
+ const view={app:{process:'chrome',title:'Shop'},targets:[{id:1,role:'Button',name:'Send'},{id:2,role:'Button',name:'Buy now'},{id:3,role:'Button',name:'Next'}]};
+ const off={apps:false,clicks:false,keys:false,windows:false,media:false,power:false,games:false,send:false,money:false};
+ assert.ok(needsConfirmation({tool:'click',target:1},view,off));assert.ok(!needsConfirmation({tool:'click',target:1},view,{...off,send:true}));
+ assert.ok(needsConfirmation({tool:'click',target:2},view,{...off,send:true}));assert.ok(!needsConfirmation({tool:'click',target:2},view,{...off,money:true}));
+ assert.ok(!needsConfirmation({tool:'click',target:3},view,off));
+ assert.ok(needsConfirmation({tool:'media',action:'mute'},view,off));assert.ok(!needsConfirmation({tool:'media',action:'mute'},view,{...off,media:true}));
+ assert.ok(needsConfirmation({tool:'open_app',name:'Terminal'},view,{...off,apps:true}));
+});

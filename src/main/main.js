@@ -14,10 +14,11 @@ const config = require('./config');
 const { CHARACTERS, characterFor } = require('./characters');
 const { createUserCharacters } = require('./user-characters');
 let userCharacters;
-const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES } = require('./speech');
-const speech = createSpeech({ script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
+const { createSpeech, speechSettings, CLOUD_VOICES, EDGE_VOICES, KOKORO_VOICES } = require('./speech');
+const speech = createSpeech({ kokoroDir: () => path.join(app.getPath('userData'), 'kokoro'), script: path.join(__dirname, 'speech.ps1').replace(/app\.asar([\\/])/, 'app.asar.unpacked$1') });
 const { createListening, listeningSettings } = require('./listening');
-const { createNative, createComputer, SECURITY } = require('./computer');
+const { createNative, createComputer, SECURITY, SWITCHES, LEVELS } = require('./computer');
+const { TIERS, tierModel } = require('./tiers');
 const { createSystemTools } = require('./computer-system');
 let computer, computerNative, computerConfig, computerModel;
 let voiceAgentAPI, voiceAgentSession=null;
@@ -52,6 +53,18 @@ let overlay = null;
 let tray = null;
 let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
+// her mini player: what's playing (Spotify, a browser, any player Windows or macOS knows), every few
+// seconds, through a computer helper of its own; she hears of it only when it changes
+let playerNative = null, lastPlaying = '';
+function watchMusic() {
+  setInterval(async () => {
+    if (config.load().miniPlayer === false || !overlay) { if (lastPlaying) { lastPlaying = ''; sendCommand('now-playing', {}); } return; }
+    playerNative ||= createNative();
+    const info = await playerNative.request({ action: 'now_playing' }).catch(() => null);
+    const now = JSON.stringify(info?.title ? { title: info.title, artist: info.artist || '', status: info.status } : {});
+    if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+  }, 4000).unref();
+}
 const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
 // a.b.c newer than x.y.z
 const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); const i = [0, 1, 2].find((k) => (x[k] || 0) !== (y[k] || 0)); return i !== undefined && (x[i] || 0) > (y[i] || 0); };
@@ -530,6 +543,16 @@ function rebuildTray() {
           type: 'radio', checked: cfg.provider === provider, click: () => pickProvider(provider),
         })),
         { type: 'separator' },
+        // her three brain tiers: picking one picks that model from the provider's list
+        ...(chatModels?.length > 1 ? [
+          { label: th ? 'ระดับความฉลาด' : 'Brain', enabled: false },
+          ...TIERS.map((tier) => {
+            const model = tierModel(chatModels, tier);
+            const name = { normal: th ? 'NORMAL · เร็ว ประหยัด' : 'NORMAL · fast', higher: th ? 'HIGHER · สมดุล' : 'HIGHER · balanced', max: th ? 'MAX INTELLIGENCE · ฉลาดสุด' : 'MAX INTELLIGENCE' }[tier];
+            return { label: `${name} (${model})`, type: 'radio', checked: cfg.brainTier === tier && pickModel(cfg) === model, click: () => updateConfig({ brainTier: tier, chatModel: model }) };
+          }),
+          { type: 'separator' },
+        ] : []),
         { label: th ? 'โมเดล' : 'Model', enabled: false },
         ...(chatModels?.length
           ? chatModels.map((name) => ({
@@ -634,7 +657,7 @@ function rebuildTray() {
       { label: th ? 'ไมค์ คำเรียก และ ElevenLabs…' : 'Mic, wake phrase and ElevenLabs…', click: () => sendCommand('listening') },
       ...item.sound.submenu,
     ] },
-    { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
+    { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, { label: th ? 'มินิเพลเยอร์ และเต้นตามเพลง' : 'Mini player, and dancing to music', type: 'checkbox', checked: cfg.miniPlayer !== false, click: (it) => updateConfig({ miniPlayer: it.checked }) }, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
     { id: 'agents', title: 'Coding AI', items: [
       item.watch,
       ...(cfg.claude ? [
@@ -899,15 +922,16 @@ function registerIpc() {
       return llm.chat(cfg.provider,cfg,{model:computerModel,messages:[{role:'system',content:prompt},observation]},()=>{},AbortSignal.any([signal,timeout]));
     },
   });
-  const computerOptions=()=>{const saved=config.load().computerControl||{};return {consent:saved.consent===true&&saved.provider===config.load().provider,voice:saved.voice===true,images:saved.images===true,security:SECURITY.includes(saved.security)?saved.security:'guarded'};};
+  const computerOptions=()=>{const saved=config.load().computerControl||{};return {consent:saved.consent===true&&saved.provider===config.load().provider,voice:saved.voice===true,images:saved.images===true,security:SECURITY.includes(saved.security)?saved.security:'guarded',switches:validSwitches(saved.switches)||LEVELS[SECURITY.includes(saved.security)?saved.security:'guarded']};};
+  const validSwitches=v=>v&&typeof v==='object'&&SWITCHES.every(k=>typeof v[k]==='boolean')?Object.fromEntries(SWITCHES.map(k=>[k,v[k]])):null;
   ipcMain.handle('computer:info',()=>({settings:computerOptions(),provider:config.load().provider}));
-  ipcMain.handle('computer:save',(_e,value)=>{if(!value||['consent','voice','images'].some(k=>typeof value[k]!=='boolean')||(value.security!==undefined&&!SECURITY.includes(value.security)))throw new Error('ตัวเลือกควบคุมไม่ถูกต้อง');const prior=computerOptions();if(!value.consent||(prior.images&&!value.images)||(prior.voice&&!value.voice))computer.stop();updateConfig({computerControl:{consent:value.consent,voice:value.voice,images:value.images,security:value.security||computerOptions().security,provider:config.load().provider}});return computerOptions();});
+  ipcMain.handle('computer:save',(_e,value)=>{if(!value||['consent','voice','images'].some(k=>typeof value[k]!=='boolean')||(value.security!==undefined&&!SECURITY.includes(value.security))||(value.switches!==undefined&&!validSwitches(value.switches)))throw new Error('ตัวเลือกควบคุมไม่ถูกต้อง');const prior=computerOptions();if(!value.consent||(prior.images&&!value.images)||(prior.voice&&!value.voice))computer.stop();updateConfig({computerControl:{consent:value.consent,voice:value.voice,images:value.images,security:value.security||computerOptions().security,switches:value.switches?validSwitches(value.switches):LEVELS[value.security||computerOptions().security],provider:config.load().provider}});return computerOptions();});
   ipcMain.handle('computer:start' , (_e, request) => {
     if(computer.busy)throw new Error('มีงานกำลังทำอยู่');
     if(request?.voice&&(!computerOptions().consent||!computerOptions().voice))throw new Error('กรุณาอนุญาตเริ่มงานด้วยเสียงก่อน');
     computerConfig=llmConfig();computerModel=pickModel(computerConfig);
     if(!computerModel)throw new Error('กรุณาตั้งค่า AI และเลือกโมเดลก่อนเริ่ม');
-    const {task,consent,images,voice}=request||{};return computer.start({task,consent,images,voice,security:computerOptions().security});
+    const {task,consent,images,voice}=request||{};return computer.start({task,consent,images,voice,security:computerOptions().security,switches:computerOptions().switches});
   });
   ipcMain.handle('computer:answer', (_e, value) => {if(!value||typeof value.jobId!=='string'||typeof value.approvalId!=='string')throw new Error('คำยืนยันต้องตรงกับขั้นตอนปัจจุบัน');return computer.answer(value);});
   ipcMain.on('computer:stop', () => computer.stop());
@@ -932,7 +956,7 @@ function registerIpc() {
     if(!computerOptions().consent||!computerOptions().voice)throw Error('ยังไม่ได้ทำ: เปิดควบคุมเครื่อง อนุญาตอ่านหน้าต่างและเริ่มงานด้วยเสียง แล้วบันทึกสิทธิ์ก่อน');
     const plan=voiceAgent.toolAction(name,args);computerConfig=llmConfig();computerModel=pickModel(computerConfig);
     if(!plan.action&&!computerModel)throw Error('ตั้งค่า AI สำหรับวางแผนควบคุมเครื่องก่อน');
-    const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly,security:computerOptions().security});
+    const id=computer.start({task:plan.task||name+' '+JSON.stringify(args),consent:true,voice:true,images:computerOptions().images,directAction:plan.action,readOnly:plan.readOnly,security:computerOptions().security,switches:computerOptions().switches});
     return JSON.stringify({status:'accepted',jobId:id,message:'เริ่มรับงานแล้ว ยังไม่ใช่ผลสำเร็จ รอคำถามหรือผลตรวจจากระบบงาน'});
   });
   listening = createListening({ directory: path.join(app.getPath('userData'), 'voice-models') });
@@ -949,18 +973,22 @@ function registerIpc() {
   ipcMain.handle('listening:install', (_e, model) => listening.install(text => overlay?.webContents.send('listening:progress', text), model));
   ipcMain.handle('listening:transcribe', (_e, { bytes, wakeOnly } = {}) => listening.transcribe(bytes, config.load().listening, listeningSettings(config.load().listening).provider === 'gemini' ? setup.openKeys(config.load().apiKeys).gemini || process.env.GEMINI_API_KEY : setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY, Boolean(wakeOnly)));
   ipcMain.on('listening:stop', () => listening.stop());
-  ipcMain.handle('speech:info', async (_e, refresh) => ({ settings: speechSettings(config.load().speech), voices: await speech.voices(Boolean(refresh)).catch(() => []), cloudVoices: CLOUD_VOICES, edgeVoices: EDGE_VOICES, hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY) }));
+  ipcMain.handle('speech:info', async (_e, refresh) => ({ settings: speechSettings(config.load().speech), voices: await speech.voices(Boolean(refresh)).catch(() => []), cloudVoices: CLOUD_VOICES, edgeVoices: EDGE_VOICES, kokoroVoices: KOKORO_VOICES, hasKeys: Object.fromEntries(['openai', 'elevenlabs', 'fish', 'custom'].map((p) => [p, Boolean(speechKey(p))])), hasKey: Boolean(setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY) }));
   ipcMain.handle('speech:save', (_e, { settings, key } = {}) => {
     const patch = { speech: speechSettings(settings) };
     if (key) {
       if (typeof key !== 'string' || key.length > 512 || /[\r\n]/.test(key)) throw new Error('API key ไม่ถูกต้อง');
       if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows ยังเข้ารหัสคีย์ไม่ได้ กรุณาลองใหม่');
-      patch.apiKeys = { ...config.load().apiKeys, openai: `enc:${safeStorage.encryptString(key.trim()).toString('base64')}` };
+      const slot = { openai: 'openai', elevenlabs: 'elevenlabs', fish: 'fish', custom: 'speechCustom' }[patch.speech.provider];
+      if (!slot) throw new Error('บริการนี้ไม่ใช้ API key');
+      patch.apiKeys = { ...config.load().apiKeys, [slot]: `enc:${safeStorage.encryptString(key.trim()).toString('base64')}` };
     }
     updateConfig(patch);
     return patch.speech;
   });
-  ipcMain.handle('speech:speak', (_e, text) => speech.speak(text, config.load().speech, setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY));
+  // the key of the voice service in use (ElevenLabs shares the voice agent's)
+  const speechKey = (provider) => ({ openai: setup.openKeys(config.load().apiKeys).openai || process.env.OPENAI_API_KEY, elevenlabs: setup.openKeys(config.load().apiKeys).elevenlabs || process.env.ELEVENLABS_API_KEY, fish: setup.openKeys(config.load().apiKeys).fish, custom: setup.openKeys(config.load().apiKeys).speechCustom })[provider] || '';
+  ipcMain.handle('speech:speak', (_e, text) => speech.speak(text, config.load().speech, speechKey(speechSettings(config.load().speech).provider)));
   ipcMain.on('speech:stop', () => speech.stop());
   ipcMain.on('speech:windowsSettings', () => shell.openExternal('ms-settings:speech'));
   ipcMain.handle('characters:preview', (_e, bytes) => userCharacters.preview(bytes));
@@ -1429,6 +1457,7 @@ function main() {
       checkUpdate();
       setInterval(checkUpdate, 6 * 60 * 60 * 1000); // she runs all day
     }
+    watchMusic();
     llm.restoreClaude(readMemory().claude);
     refreshModels(); // for her menu's model list
     setTimeout(() => launch.launchables().catch(() => {}), 20000); // what she can open, before you ask
