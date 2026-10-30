@@ -188,6 +188,23 @@ Done right away, without a multi-step job:
 - **Always asks first:** anything that sends, deletes or creates (sending mail, creating or deleting events)
 - **Any other MCP server:** add it to `mcp.json`, the same shape as Claude Code's, and its tools work in chat
 
+- **To-do list, meeting prep, VIP senders, unanswered mail, meeting conflicts, routines:** see [ASSISTANT_TH.md](docs/ASSISTANT_TH.md)
+
+### 📰 News and daily briefs
+
+- **News on your topics:** from Google News and your own RSS feeds, de-duplicated, summarized by AI on a schedule
+- **Breaking news:** an alert at once for your words
+- **Morning and evening briefs:** meetings, important mail, open tasks and news, read aloud if you like
+- **Models by task:** chat / tools / computer control / background jobs / vision can each use their own model
+
+### 📱 Telegram and Vibecode from your phone
+
+- **Telegram:** text, voice messages, photos and videos; she answers in words or her voice; paired with your chat only
+- **Alerts on your phone:** always, or only while you're away (LINE too)
+- **Vibecode:** create projects and drive Claude Code or Codex by text, voice or a mockup; approve the agent's permissions on your phone; diff, commit, open a PR
+- **The computer from your phone:** screenshots, computer jobs, lock or shut down; off by default and behind a PIN
+- See [TELEGRAM_TH.md](docs/TELEGRAM_TH.md)
+
 ### 🎵 Music and the mini player
 
 - **Mini player:** bottom right, shows what's playing in Spotify, a browser or any player your system knows, with ⏮ ⏯ ⏭
