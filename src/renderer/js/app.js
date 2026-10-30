@@ -133,6 +133,17 @@ async function boot() {
     interactive = on;
     host.setInteractive(on);
   };
+  // Her dialogs (characters, voice, mic, settings, computer): while any is open the overlay takes
+  // focus and clicks. Decided from all of them at once: one closing as another opens (Settings opening
+  // the voice page) must not leave the open one unclickable.
+  let dialogsOpen = false;
+  const syncDialogs = () => queueMicrotask(() => {
+    const open = Boolean(picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open || computerUI?.open);
+    capri.pickerOpen = open;
+    if (open !== dialogsOpen || open) host.focusOverlay(open);
+    dialogsOpen = open;
+    if (open) setInteractive(true); else refreshHit();
+  });
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
     if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open || computerUI?.open) return setInteractive(true);
@@ -255,9 +266,11 @@ async function boot() {
 
   // Her guide (guide.js): her welcome on first launch, and "How does it work?" in her menu,
   // where she takes you to things and points at them.
-  const guide = new Guide({ capri, panel, voice, host, brain });
+  // chat and guide let go of the keyboard when they close, but never from under an open dialog
+  const keepFocus = { ...host, focusOverlay: (on) => host.focusOverlay(on || dialogsOpen) };
+  const guide = new Guide({ capri, panel, voice, host: keepFocus, brain });
   // Talking to her (chat.js): "Talk to her" in her menu, or the button when you click her idle.
-  const chat = new Chat({ capri, panel, voice, host, brain });
+  const chat = new Chat({ capri, panel, voice, host: keepFocus, brain });
   let characterRequest = 0;
   const switchCharacter = async (character) => {
     const request = ++characterRequest;
@@ -295,33 +308,28 @@ async function boot() {
       await switchCharacter(cfg.character);
       if (capri.character.id !== characterId) throw new Error('Character unavailable');
     },
-    onVisibility: (open) => {
-      capri.pickerOpen = open || speechUI?.open || listeningUI?.open;
-      host.focusOverlay(open);
-      if (open) setInteractive(true);
-      else refreshHit();
-    },
+    onVisibility: () => syncDialogs(),
   });
   speechUI = new Speech({ host, root: document.getElementById('speech-settings'), stopButton: document.getElementById('speech-stop'),
     lastReply: () => chat.history.findLast((message) => message.role === 'assistant')?.content || '',
-    onVisibility: (open) => { capri.pickerOpen = open || picker.open || listeningUI?.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+    onVisibility: () => syncDialogs(),
   });
   speechUI.configure(config);
   capri.talk = () => listeningUI?.realtime?.active?listeningUI.realtime.level():speechUI.level();
   listeningUI = new Listening({ host, root: document.getElementById('listening-settings'), indicator: document.getElementById('listening-stop'), speech: speechUI, chat,
     onWake: () => { capri.wake(); if (capri.mode !== 'alert') capri.perform('curious', capri.towardCenter()); },
-    onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+    onVisibility: () => syncDialogs(),
   });
   listeningUI.configure(config);
   settingsUI = new Settings({ host, root: document.getElementById('all-settings'),
     onOpen: (id) => ({ ai: () => setup.chat(), characters: () => picker.show(), speech: () => speechUI.show(), listening: () => listeningUI.show(), computer: () => computerUI.show(), customize: () => custom.open() })[id](),
-    onVisibility: (open) => { capri.pickerOpen = open || picker.open || speechUI.open || listeningUI.open; host.focusOverlay(open); if (open) setInteractive(true); else refreshHit(); },
+    onVisibility: () => syncDialogs(),
     portrait: (character) => characterAsset(character, 'portrait'),
     runAI: (choice) => guide.scene(() => (choice === 'local' ? setup.ollama() : choice === 'key' ? setup.pickKeyed() : setup.use('pollinations'))),
     onTalk: () => chat.start(),
   });
   computerUI = new Computer({host,root:document.getElementById('computer-settings'),indicator:document.getElementById('computer-stop'),
-    onVisibility:open=>{capri.pickerOpen=open||picker.open||speechUI.open||listeningUI.open||settingsUI.open;host.focusOverlay(open);if(open)setInteractive(true);else refreshHit();},
+    onVisibility: () => syncDialogs(),
     onStart:({voice})=>{if(!voice)listeningUI.stop();listeningUI.externalJob=voice;speechUI.stop();chat.close({keepListening:voice});panel.hide();picker.hide();speechUI.hide();listeningUI.hide();settingsUI.hide();},
     onPermission:request=>listeningUI.requestConfirmation(request),
     onQuestion:state=>{if(!state.voice)return false;if(listeningUI.realtime?.ask(state))return true;
