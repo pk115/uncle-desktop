@@ -10,7 +10,6 @@ import { Chat } from './chat.js';
 import { Setup } from './setup.js';
 import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
-import { loadCharacterSource } from './character-assets.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
 import { VoiceAgent } from './voice-agent.js';
@@ -53,7 +52,7 @@ async function boot() {
   let settingsUI = null;
   let computerUI = null;
   const loadCharacter = (character) => Promise.all([
-    loadCharacterSource(character),
+    loadImage(characterAsset(character, 'atlas')),
     loadImage(characterAsset(character, 'portrait')),
   ]);
   const [image, portrait] = await loadCharacter(config.character);

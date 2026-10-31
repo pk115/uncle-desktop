@@ -307,6 +307,7 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
+| **0.20.2** | Fix: the character never appeared in 0.20.0–0.20.1 (a file left out of a commit); the mini player switch applies at once; Kokoro keeps punctuation with Thai |
 | **0.20.1** | App icon: UncleDev instead of Capri |
 | **0.20.0** | Kokoro speaks Thai (experimental), always-listening mode, Mic mode menu, small draggable mic and player icons that show the step, Ctrl+wheel to switch characters, fix for dialogs that stopped taking clicks, Thai song titles, ~80 MB less memory |
 | **0.19.0** | Telegram (text, voice, photos, video), Vibecode from your phone with Claude Code / Codex, news topics and briefs, local tasks, VIP mail, follow-ups, meeting prep, timed routines, remote PC control with PIN, LINE alerts |
