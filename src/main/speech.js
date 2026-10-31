@@ -33,10 +33,17 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
       let tts = null;
       // Thai comes as phonemes (thai-g2p.js): read out piece by piece, Kokoro takes ~500 at a time
       const say = async (run, voice, speed) => {
-        if (!('thai' in run)) return (await tts.generate(run.text, { voice, speed })).audio;
+        if (!('thai' in run)) return (await english(run.text, voice, speed)).audio;
         const parts = [], pieces = run.thai.match(/.{1,380}(?:,\s|$)|.{1,380}/g) || [];
         for (const ph of pieces) parts.push((await tts.generate_from_ids(tts.tokenizer(ph, { truncation: true }).input_ids, { voice, speed: speed * 0.9 })).audio);
         return joined(parts);
+      };
+      // kokoro-js only lets its English voices read text; the Japanese and Chinese ones get the
+      // same English phonemes straight (otherwise: "Voice jf_alpha not found")
+      const english = async (text, voice, speed) => {
+        if (tts.voices[voice]) return tts.generate(text, { voice, speed });
+        const ph = (await require(workerData.phonemizer).phonemize(text, 'en-us')).join(' ');
+        return tts.generate_from_ids(tts.tokenizer(ph, { truncation: true }).input_ids, { voice, speed });
       };
       const joined = (parts) => { const all = new Float32Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { all.set(p, at); at += p.length; } return all; };
       parentPort.on('message', async ({ id, text, runs, voice, speed }) => {
@@ -47,7 +54,7 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
             tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' });
           }
           let audio;
-          if (!runs) audio = await tts.generate(text, { voice, speed });
+          if (!runs) audio = await english(text, voice, speed);
           else {
             const parts = [];
             for (const run of runs) parts.push(await say(run, voice, speed));
@@ -57,7 +64,7 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
           parentPort.postMessage({ id, audio: Buffer.from(audio.toWav()).toString('base64') });
         } catch (error) { parentPort.postMessage({ id, error: String(error.message || error) }); }
       });
-    `, { eval: true, workerData: { cacheDir, kokoro: require.resolve('kokoro-js'), transformers: require.resolve('@huggingface/transformers') } });
+    `, { eval: true, workerData: { cacheDir, kokoro: require.resolve('kokoro-js'), phonemizer: require.resolve('phonemizer'), transformers: require.resolve('@huggingface/transformers') } });
     kokoroWorker.on('error', () => { kokoroWorker = null; });
     kokoroWorker.unref();
   }
