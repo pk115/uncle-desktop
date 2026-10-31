@@ -505,7 +505,16 @@ function rendererConfig() {
   return { ...cfg, hotkeys: hotkeys(), characterId: character.id, character, characters: CHARACTERS, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
 }
 
+// the mic status and the mini player: as they were, or a small icon (dragged anywhere either way)
+function badgeLook(key, label) {
+  const th = resolveLang(config.load().lang) === 'th', badges = config.load().badges || {};
+  return { label, submenu: [['full', th ? 'แบบเต็ม' : 'Full'], ['icon', th ? 'ไอคอนเล็ก' : 'Small icon']].map(([look, text]) => ({
+    label: text, type: 'radio', checked: (badges[key] || 'full') === look, click: () => updateConfig({ badges: { ...badges, [key]: look } }),
+  })) };
+}
 function updateConfig(patch) {
+  if ('badges' in patch && !Object.values(patch.badges || {}).every((v) => ['full', 'icon'].includes(v))) throw new Error('Invalid badge look');
+  if ('badgePos' in patch && !Object.values(patch.badgePos || {}).every((p) => Number.isFinite(p?.right) && Number.isFinite(p?.bottom))) throw new Error('Invalid badge position');
   if ('scale' in patch && (!Number.isFinite(patch.scale) || patch.scale < 0.45 || patch.scale > 1.6)) throw new Error('Invalid character scale');
   if ('characterFraming' in patch && !['full', 'bust'].includes(patch.characterFraming)) throw new Error('Invalid character framing');
   if ('voiceAgent' in patch) {patch.voiceAgent=voiceAgent.settings(patch.voiceAgent);voiceAgentAPI?.stop();voiceAgentSession=null;computer?.stop();sendCommand('voice-agent-stop');}
@@ -741,6 +750,9 @@ function rebuildTray() {
     { id: 'voice', title: th ? 'เสียงและไมค์' : 'Voice', items: [
       { label: th ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
       { label: th ? 'ไมค์ คำเรียก และ ElevenLabs…' : 'Mic, wake phrase and ElevenLabs…', click: () => sendCommand('listening') },
+      badgeLook('mic', th ? 'สถานะไมค์' : 'Mic status'),
+      badgeLook('player', th ? 'มินิเพลเยอร์' : 'Mini player'),
+      { label: th ? 'คืนตำแหน่งสถานะไมค์และเพลง' : 'Reset mic and player positions', click: () => updateConfig({ badgePos: {} }) },
       ...item.sound.submenu,
     ] },
     { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, { label: th ? 'มินิเพลเยอร์ และเต้นตามเพลง' : 'Mini player, and dancing to music', type: 'checkbox', checked: cfg.miniPlayer !== false, click: (it) => updateConfig({ miniPlayer: it.checked }) }, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },

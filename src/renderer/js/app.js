@@ -130,6 +130,37 @@ async function boot() {
 
   // Click-through everywhere except on her body, the panel and her biochip.
   let interactive = false;
+  // The mic status and the mini player: full or a small icon (Settings), dragged anywhere, where
+  // you left them remembered per look. A drag doesn't count as a click.
+  let badgeDrag = null, badgeCfg = config;
+  const BADGES = [['mic', 'listening-stop'], ['player', 'mini-player']];
+  const badgeLook = () => {
+    for (const [key, id] of BADGES) {
+      const node = document.getElementById(id); if (!node) continue;
+      const look = badgeCfg.badges?.[key] === 'icon' ? 'icon' : 'full';
+      node.classList.toggle('is-icon', look === 'icon');
+      const p = badgeCfg.badgePos?.[`${key}-${look}`];
+      Object.assign(node.style, p ? { left: 'auto', top: 'auto', right: `${p.right}px`, bottom: `${p.bottom}px` } : { left: '', top: '', right: '', bottom: '' });
+    }
+  };
+  const draggable = (node, key) => {
+    node.addEventListener('mousedown', (e) => { if (!e.button) badgeDrag = { node, key, x: e.clientX, y: e.clientY, r: node.getBoundingClientRect(), moved: false }; });
+    node.addEventListener('click', (e) => { if (node.dataset.dragged) { delete node.dataset.dragged; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  };
+  window.addEventListener('mousemove', (e) => {
+    const d = badgeDrag; if (!d || (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5)) return;
+    d.moved = true;
+    const right = Math.round(Math.min(Math.max(0, innerWidth - d.r.right - (e.clientX - d.x)), innerWidth - d.r.width));
+    const bottom = Math.round(Math.min(Math.max(0, innerHeight - d.r.bottom - (e.clientY - d.y)), innerHeight - d.r.height));
+    Object.assign(d.node.style, { left: 'auto', top: 'auto', right: `${right}px`, bottom: `${bottom}px` });
+  }, true);
+  window.addEventListener('mouseup', () => {
+    const d = badgeDrag; badgeDrag = null; if (!d?.moved) return;
+    d.node.dataset.dragged = '1'; setTimeout(() => delete d.node.dataset.dragged, 300);
+    const look = d.node.classList.contains('is-icon') ? 'icon' : 'full';
+    host.setConfig({ badgePos: { ...badgeCfg.badgePos, [`${d.key}-${look}`]: { right: parseFloat(d.node.style.right), bottom: parseFloat(d.node.style.bottom) } } });
+  }, true);
+  draggable(document.getElementById('listening-stop'), 'mic'); badgeLook();
   let mouse = null;
   const setInteractive = (on) => {
     if (on === interactive) return;
@@ -150,7 +181,7 @@ async function boot() {
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
     if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open || computerUI?.open) return setInteractive(true);
-    if (capri.dragging) return setInteractive(true);
+    if (capri.dragging || badgeDrag) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
     const onPanel = r && mouse.x >= r.left && mouse.x <= r.right && mouse.y >= r.top && mouse.y <= r.bottom;
@@ -744,6 +775,7 @@ async function boot() {
   });
 
   host.onConfig((cfg) => {
+    badgeCfg = cfg; badgeLook();
     speechUI.configure(cfg);
     listeningUI.realtime.configure(cfg);
     listeningUI.configure(cfg);
@@ -863,12 +895,12 @@ async function boot() {
         mp = document.createElement('div'); mp.id = 'mini-player'; mp.setAttribute('role', 'region'); mp.setAttribute('aria-label', 'มินิเพลเยอร์');
         mp.innerHTML = '<span class="mp-note" aria-hidden="true">♪</span><span class="mp-text"></span><button type="button" data-a="previous" aria-label="เพลงก่อนหน้า">⏮</button><button type="button" data-a="pause" aria-label="เล่นหรือหยุด">⏯</button><button type="button" data-a="next" aria-label="เพลงถัดไป">⏭</button>';
         for (const ev of ['mousedown', 'mouseup', 'click']) mp.addEventListener(ev, (e) => e.stopPropagation());
-        mp.addEventListener('click', (e) => { const a = e.target.dataset?.a; if (a) host.media(a); });
-        document.body.append(mp);
+        mp.addEventListener('click', (e) => { const a = e.target.dataset?.a || (mp.classList.contains('is-icon') && 'pause'); if (a) host.media(a); });
+        document.body.append(mp); draggable(mp, 'player'); badgeLook();
       }
       const on = Boolean(cmd.title), playing = on && /play/i.test(cmd.status || '');
       mp.hidden = !on; mp.classList.toggle('is-playing', playing);
-      mp.querySelector('.mp-text').textContent = on ? `${cmd.title}${cmd.artist ? ` — ${cmd.artist}` : ''}` : '';
+      mp.querySelector('.mp-text').textContent = mp.title = on ? `${cmd.title}${cmd.artist ? ` — ${cmd.artist}` : ''}` : '';
       clearInterval(window.__uncleMusicDance);
       if (playing) window.__uncleMusicDance = setInterval(() => { if (!capri.busy && !capri.act && !capri.dragging && !capri.hidden && !capri.stowed && !capri.dormant) capri.perform('hop'); }, 1500);
       return;
