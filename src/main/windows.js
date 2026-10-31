@@ -17,7 +17,8 @@ const unpacked = (file) => path.join(__dirname, file).replace(`app.asar${path.se
 const SCRIPT = unpacked('windows.ps1');
 const MAC = process.platform === 'darwin';
 
-function startWindowWatch({ overlay, onUpdate }) {
+// onPlaying(info): what's playing changed (Windows only; the Mac asks its computer helper)
+function startWindowWatch({ overlay, onUpdate, onPlaying = () => {} }) {
   if (process.platform !== 'win32' && !MAC) return { stop() {}, refresh() {} };
 
   let child = null;
@@ -57,11 +58,14 @@ function startWindowWatch({ overlay, onUpdate }) {
       ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
     readline.createInterface({ input: child.stdout }).on('line', (line) => {
+      let data;
       try {
-        last = JSON.parse(line);
+        data = JSON.parse(line);
       } catch {
         return;
       }
+      if (data.playing) return onPlaying(data.playing);
+      last = data;
       send();
     });
     child.stderr.on('data', (d) => console.error('[capri] window watch:', String(d).trim()));

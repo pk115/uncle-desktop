@@ -126,14 +126,18 @@ let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
 // her mini player: what's playing (Spotify, a browser, any player Windows or macOS knows), every few
 // seconds, through a computer helper of its own; she hears of it only when it changes
+// (on Windows the window watcher already running tells her, so no second PowerShell)
 let playerNative = null, lastPlaying = '';
+function showPlaying(info) {
+  const now = JSON.stringify(info?.title && config.load().miniPlayer !== false && overlay ? { title: info.title, artist: info.artist || '', status: info.status } : {});
+  if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+}
 function watchMusic() {
+  if (process.platform !== 'darwin') return;
   setInterval(async () => {
-    if (config.load().miniPlayer === false || !overlay) { if (lastPlaying) { lastPlaying = ''; sendCommand('now-playing', {}); } return; }
+    if (config.load().miniPlayer === false) return showPlaying(null);
     playerNative ||= createNative();
-    const info = await playerNative.request({ action: 'now_playing' }).catch(() => null);
-    const now = JSON.stringify(info?.title ? { title: info.title, artist: info.artist || '', status: info.status } : {});
-    if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+    showPlaying(await playerNative.request({ action: 'now_playing' }).catch(() => null));
   }, 4000).unref();
 }
 const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
@@ -1827,6 +1831,7 @@ function main() {
         lastWindows = data;
         overlay?.webContents.send('windows:update', data);
       },
+      onPlaying: showPlaying,
     });
     createBridge({
       port: PORT,

@@ -1,4 +1,4 @@
-# Watches the top-level windows so Capri can sit on them.
+﻿# Watches the top-level windows so Capri can sit on them.
 # Prints one JSON line whenever something changes: the foreground window and the visible
 # windows in z-order (front first), as physical-pixel frame bounds. No contents, and no titles:
 # the title of the window in front is only checked against a short list of AI names (ChatGPT,
@@ -232,9 +232,31 @@ public static class CapriWindows {
 "@
 
 [CapriWindows]::Init()
+
+# what's playing (her mini player), every ~4 s, here so it needs no helper of its own
+$playingLast = ''
+$asTask = $null
+function Get-Playing {
+  if ($null -eq $script:asTask) {
+    Add-Type -AssemblyName System.Runtime.WindowsRuntime
+    $script:asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.IsGenericMethod -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
+  }
+  $await = { param($op, $type) $t = $script:asTask.MakeGenericMethod($type).Invoke($null, @($op)); if (-not $t.Wait(1500)) { throw 'timeout' }; $t.Result }
+  $mt = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime]
+  $session = (& $await ($mt::RequestAsync()) $mt).GetCurrentSession()
+  if ($null -eq $session) { return @{} }
+  $props = & $await ($session.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties,Windows.Media.Control,ContentType=WindowsRuntime])
+  if (-not $props.Title) { return @{} }
+  @{ title = $props.Title; artist = [string]$props.Artist; status = $session.GetPlaybackInfo().PlaybackStatus.ToString() }
+}
+
 $last = ''
 $tick = 0
 while ($true) {
+  if ($tick % 27 -eq 0) {
+    try { $p = @{ playing = (Get-Playing) } | ConvertTo-Json -Compress } catch { $p = $playingLast }
+    if ($p -ne $playingLast) { [Console]::Out.WriteLine($p); [Console]::Out.Flush(); $playingLast = $p }
+  }
   $snap = [CapriWindows]::Snapshot($Self)
   if ($snap -ne $last) {
     [Console]::Out.WriteLine($snap)
