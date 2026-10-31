@@ -1,5 +1,8 @@
 import { computerTask } from './computer-intent.js';
 import { Utterance, wakeCommand } from './listening-audio.js';
+
+const NOISE = /^(ขอบคุณ(ที่รับชม|ครับ|ค่ะ)?|thank you( for watching)?|thanks|ค่ะ|ครับ|อืม+|เอ่อ+|โอเค|ok|you|\.+)[.!?\s]*$/i;
+export const isNoise = (text) => text.replace(/[\s.,!?]/g, '').length < 3 || NOISE.test(text.trim());
 import { confirmationAnswer, runVoiceCommand } from './voice-commands.js';
 const el = (tag, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
 export class Listening {
@@ -12,7 +15,7 @@ export class Listening {
     box.append(el('h1', 'สั่งงานด้วยเสียง'), close, el('p', 'Ctrl+Alt+V กดเริ่ม/หยุดพูด · Ctrl+Alt+M ปิดไมค์ทันที (เปลี่ยนได้ใน ตั้งค่าทั้งหมด) · เปิดไมค์ใหม่เองทุกครั้งหลังเริ่มโปรแกรม'));
     const field = (label, node) => { const wrap = el('label', label); wrap.append(node); box.append(wrap); return node; };
     const select = (options) => { const n = el('select'); for (const [value, label] of options) { const o = el('option', label); o.value = value; n.append(o); } return n; };
-    this.mode = field('วิธีฟัง', select([['push', 'กดพูด — กดเริ่ม / หยุด'], ['wake', 'รอคำเรียก — ตรวจคำเรียกในเครื่อง']]));
+    this.mode = field('วิธีฟัง', select([['push', 'กดพูด — กดเริ่ม / หยุด'], ['wake', 'รอคำเรียก — ตรวจคำเรียกในเครื่อง'], ['always', 'ฟังตลอด — พูดเมื่อไหร่ก็สั่งได้ ไม่ต้องเรียกชื่อ']]));
     this.provider = field('บริการถอดคำสั่งภาษาไทย', select([['local', 'Local AI — ถอดเสียงในเครื่อง'], ['gemini', 'Gemini — ถอดเสียงออนไลน์'], ['openai', 'OpenAI — ถอดเสียงออนไลน์']]));
     this.localModel = field('โมเดล Local — ใช้ตรวจคำเรียกด้วย', select([['small', 'Whisper small — เบา (~190 MB)'], ['thai-medium', 'Thonburian Thai medium — ฝึกภาษาไทย (~539 MB)']]));
     this.silence = field('เว้นจังหวะก่อนจบประโยค (วินาที)', el('input')); this.silence.type = 'number'; this.silence.min = 0.6; this.silence.max = 2.5; this.silence.step = 0.1;
@@ -193,9 +196,9 @@ export class Listening {
       const bytes = this.utterance.push(samples);
       if (bytes) this.process(bytes).catch(e => this.error(e));
     };
-    this.indicator.hidden = false; this.startButton.textContent = s.mode === 'push' ? 'หยุดพูดและถอดเสียง' : 'ปิดการรอเรียก'; this.idle();
+    this.indicator.hidden = false; this.startButton.textContent = s.mode === 'push' ? 'หยุดพูดและถอดเสียง' : s.mode === 'always' ? 'ปิดการฟัง' : 'ปิดการรอเรียก'; this.idle();
   }
-  idle() { this.setStatus(this.confirmation?.question || this.lastResultStatus || (this.testing ? 'ทดสอบอยู่ — ลองพูดประโยคหรือคำเรียก ไม่มีการส่งคำสั่ง' : this.settings?.mode === 'wake' ? Date.now() < this.followUntil ? 'ฟังคำสั่งต่อ…' : `รอคำเรียก “${this.settings.wakeWords.join('” หรือ “')}”…` : 'ฟังอยู่ — หยุดพูดเพื่อถอดเสียง')); }
+  idle() { this.setStatus(this.confirmation?.question || this.lastResultStatus || (this.testing ? 'ทดสอบอยู่ — ลองพูดประโยคหรือคำเรียก ไม่มีการส่งคำสั่ง' : this.settings?.mode === 'wake' ? Date.now() < this.followUntil ? 'ฟังคำสั่งต่อ…' : `รอคำเรียก “${this.settings.wakeWords.join('” หรือ “')}”…` : this.settings?.mode === 'always' ? 'ฟังตลอด — พูดได้เลย' : 'ฟังอยู่ — หยุดพูดเพื่อถอดเสียง')); }
   async process(bytes) {
     if (this.processing || this.pending || !this.stream) return;
     const confirmation = this.confirmation;
@@ -247,6 +250,9 @@ export class Listening {
         const command = wakeCommand(text, this.settings.wakeWords);
         if (command !== null) { text = command; if (!text) { this.followUntil = Date.now() + 10000; return; } }
       }
+      // listening all the time hears everything: a word or two, or what speech-to-text makes up
+      // from noise (ขอบคุณที่รับชม…), is not a command
+      if (this.settings.mode === 'always' && !confirmation && !this.externalJob && isNoise(text)) { this.lastResultStatus = ''; return; }
       if (!text.trim()) return;
       this.transcript.value = text; this.sendButton.disabled = false; this.pending = true;
       if (this.settings.review) { this.setStatus('ตรวจข้อความแล้วกดส่ง หรือยกเลิก'); await this.show(); }

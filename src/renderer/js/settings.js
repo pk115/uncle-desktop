@@ -248,7 +248,7 @@ export class Settings {
     for (const [id, label] of [['thai-medium', 'Thonburian ภาษาไทย — แม่นกว่า ขนาด 550 MB (แนะนำ)'], ['small', 'Whisper small — เล็กกว่า ขนาด 200 MB']]) { const o = el('option', label + (info.models?.[id] ? ' ✓ มีแล้ว' : '')); o.value = id; model.append(o); }
     model.value = settings.localModel;
     const mode = el('select'); mode.id = 'wizard-mic-mode';
-    for (const [id, label] of [['push', 'กดพูด — กด Ctrl+Alt+V แล้วพูด'], ['wake', 'รอคำเรียก — เรียกชื่อแล้วสั่งได้เลย']]) { const o = el('option', label); o.value = id; mode.append(o); }
+    for (const [id, label] of [['push', 'กดพูด — กด Ctrl+Alt+V แล้วพูด'], ['wake', 'รอคำเรียก — เรียกชื่อแล้วสั่งได้เลย'], ['always', 'ฟังตลอด — พูดเมื่อไหร่ก็สั่งได้']]) { const o = el('option', label); o.value = id; mode.append(o); }
     mode.value = settings.mode;
     const download = button('ดาวน์โหลดโมเดลที่เลือก', async () => {
       download.disabled = true;
