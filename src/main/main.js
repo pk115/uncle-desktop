@@ -126,14 +126,18 @@ let trayMenu = null; // also what she opens when you right-click her
 let updater = null; // electron-updater, installed copies only
 // her mini player: what's playing (Spotify, a browser, any player Windows or macOS knows), every few
 // seconds, through a computer helper of its own; she hears of it only when it changes
+// (on Windows the window watcher already running tells her, so no second PowerShell)
 let playerNative = null, lastPlaying = '';
+function showPlaying(info) {
+  const now = JSON.stringify(info?.title && config.load().miniPlayer !== false && overlay ? { title: info.title, artist: info.artist || '', status: info.status } : {});
+  if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+}
 function watchMusic() {
+  if (process.platform !== 'darwin') return;
   setInterval(async () => {
-    if (config.load().miniPlayer === false || !overlay) { if (lastPlaying) { lastPlaying = ''; sendCommand('now-playing', {}); } return; }
+    if (config.load().miniPlayer === false) return showPlaying(null);
     playerNative ||= createNative();
-    const info = await playerNative.request({ action: 'now_playing' }).catch(() => null);
-    const now = JSON.stringify(info?.title ? { title: info.title, artist: info.artist || '', status: info.status } : {});
-    if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
+    showPlaying(await playerNative.request({ action: 'now_playing' }).catch(() => null));
   }, 4000).unref();
 }
 const RELEASES = 'https://github.com/pk115/uncle-desktop/releases/latest';
@@ -350,10 +354,13 @@ function fitOverlay() {
 // The pointer reaches her click-through window through a mouse hook, and Windows drops a hook that
 // doesn't answer in time without a word (waking from sleep, a locked screen, a stall): she can't be
 // clicked anymore. Off then on puts in a new one; her place on top and her size are set again too.
+// Back to what the renderer last asked for: always click-through here, and it believed she was
+// clickable (a dialog open, the pointer on her) and never asked again: nothing could be clicked.
+let overlayInteractive = false;
 function rearmOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
   overlay.setIgnoreMouseEvents(false);
-  overlay.setIgnoreMouseEvents(true, { forward: true });
+  overlay.setIgnoreMouseEvents(!overlayInteractive, { forward: true });
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
     callback(contents === overlay?.webContents && contents.getURL().startsWith('capri://app/') && permission === 'media' && details.mediaTypes?.length > 0 && details.mediaTypes.every(type => type === 'audio'));
@@ -405,6 +412,8 @@ function createOverlay() {
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // a fresh page (a reload, a crash) starts click-through, believing so too
+  overlay.webContents.on('did-start-loading', () => { overlayInteractive = false; overlay.setIgnoreMouseEvents(true, { forward: true }); });
   // macOS: on every Space, over full-screen apps too, as she is over everything on Windows
   if (process.platform === 'darwin') overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
@@ -496,7 +505,16 @@ function rendererConfig() {
   return { ...cfg, hotkeys: hotkeys(), characterId: character.id, character, characters: CHARACTERS, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
 }
 
+// the mic status and the mini player: as they were, or a small icon (dragged anywhere either way)
+function badgeLook(key, label) {
+  const th = resolveLang(config.load().lang) === 'th', badges = config.load().badges || {};
+  return { label, submenu: [['full', th ? 'แบบเต็ม' : 'Full'], ['icon', th ? 'ไอคอนเล็ก' : 'Small icon']].map(([look, text]) => ({
+    label: text, type: 'radio', checked: (badges[key] || 'full') === look, click: () => updateConfig({ badges: { ...badges, [key]: look } }),
+  })) };
+}
 function updateConfig(patch) {
+  if ('badges' in patch && !Object.values(patch.badges || {}).every((v) => ['full', 'icon'].includes(v))) throw new Error('Invalid badge look');
+  if ('badgePos' in patch && !Object.values(patch.badgePos || {}).every((p) => Number.isFinite(p?.right) && Number.isFinite(p?.bottom))) throw new Error('Invalid badge position');
   if ('scale' in patch && (!Number.isFinite(patch.scale) || patch.scale < 0.45 || patch.scale > 1.6)) throw new Error('Invalid character scale');
   if ('characterFraming' in patch && !['full', 'bust'].includes(patch.characterFraming)) throw new Error('Invalid character framing');
   if ('voiceAgent' in patch) {patch.voiceAgent=voiceAgent.settings(patch.voiceAgent);voiceAgentAPI?.stop();voiceAgentSession=null;computer?.stop();sendCommand('voice-agent-stop');}
@@ -732,6 +750,9 @@ function rebuildTray() {
     { id: 'voice', title: th ? 'เสียงและไมค์' : 'Voice', items: [
       { label: th ? 'เสียงพูดภาษาไทย…' : 'Speech settings…', click: () => sendCommand('speech') },
       { label: th ? 'ไมค์ คำเรียก และ ElevenLabs…' : 'Mic, wake phrase and ElevenLabs…', click: () => sendCommand('listening') },
+      badgeLook('mic', th ? 'สถานะไมค์' : 'Mic status'),
+      badgeLook('player', th ? 'มินิเพลเยอร์' : 'Mini player'),
+      { label: th ? 'คืนตำแหน่งสถานะไมค์และเพลง' : 'Reset mic and player positions', click: () => updateConfig({ badgePos: {} }) },
       ...item.sound.submenu,
     ] },
     { id: 'behavior', title: th ? 'พฤติกรรม' : 'Behavior', items: [item.wander, { label: th ? 'มินิเพลเยอร์ และเต้นตามเพลง' : 'Mini player, and dancing to music', type: 'checkbox', checked: cfg.miniPlayer !== false, click: (it) => updateConfig({ miniPlayer: it.checked }) }, item.possess, item.jealous, item.pcReact, item.lookAuto, item.rest, item.motion, item.screen] },
@@ -854,6 +875,14 @@ function rebuildTray() {
     { type: 'separator' },
     { label: t.talk, click: () => sendCommand('chat') },
     { label: th ? 'เริ่มพูด / ปิดไมค์' : 'Talk / stop mic', accelerator: hotkeys().voice || undefined, click: () => sendCommand('listening-toggle') },
+    // the mic in one of its three ways, started at once
+    { label: th ? 'โหมดไมค์' : 'Mic mode', submenu: [
+      ...[['push', th ? 'กดพูด' : 'Push to talk'], ['wake', th ? 'เรียกชื่อแล้วสั่ง' : 'Wake phrase'], ['always', th ? 'ฟังตลอด' : 'Always listening']].map(([mode, label]) => ({
+        label, type: 'radio', checked: listeningSettings(cfg.listening).mode === mode, click: () => sendCommand('listening-mode', { mode }),
+      })),
+      { type: 'separator' },
+      { label: th ? 'ปิดไมค์' : 'Mic off', click: () => { listening?.stop(); sendCommand('listening-stop'); } },
+    ] },
     { label: t.lookNow, click: () => sendCommand('look') },
     item.quick,
     item.size,
@@ -1378,6 +1407,7 @@ ${state.evidence}` : ''}` }); }
     return true;
   });
   ipcMain.on('overlay:interactive', (_e, on) => {
+    overlayInteractive = Boolean(on);
     overlay?.setIgnoreMouseEvents(!on, { forward: true });
   });
   ipcMain.on('overlay:rearm', () => rearmOverlay()); // the pointer moved over her and she never heard of it
@@ -1827,6 +1857,7 @@ function main() {
         lastWindows = data;
         overlay?.webContents.send('windows:update', data);
       },
+      onPlaying: showPlaying,
     });
     createBridge({
       port: PORT,

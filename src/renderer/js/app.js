@@ -10,6 +10,7 @@ import { Chat } from './chat.js';
 import { Setup } from './setup.js';
 import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
+import { loadCharacterSource } from './character-assets.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
 import { VoiceAgent } from './voice-agent.js';
@@ -45,13 +46,14 @@ const mine = (cfg) => ({ userName: cfg.userName || '', persona: cfg.persona || '
 
 async function boot() {
   const config = await host.getConfig();
+  let characters = config.characters || [];
   let picker = null;
   let speechUI = null;
   let listeningUI = null;
   let settingsUI = null;
   let computerUI = null;
   const loadCharacter = (character) => Promise.all([
-    loadImage(characterAsset(character, 'atlas')),
+    loadCharacterSource(character),
     loadImage(characterAsset(character, 'portrait')),
   ]);
   const [image, portrait] = await loadCharacter(config.character);
@@ -128,6 +130,37 @@ async function boot() {
 
   // Click-through everywhere except on her body, the panel and her biochip.
   let interactive = false;
+  // The mic status and the mini player: full or a small icon (Settings), dragged anywhere, where
+  // you left them remembered per look. A drag doesn't count as a click.
+  let badgeDrag = null, badgeCfg = config;
+  const BADGES = [['mic', 'listening-stop'], ['player', 'mini-player']];
+  const badgeLook = () => {
+    for (const [key, id] of BADGES) {
+      const node = document.getElementById(id); if (!node) continue;
+      const look = badgeCfg.badges?.[key] === 'icon' ? 'icon' : 'full';
+      node.classList.toggle('is-icon', look === 'icon');
+      const p = badgeCfg.badgePos?.[`${key}-${look}`];
+      Object.assign(node.style, p ? { left: 'auto', top: 'auto', right: `${p.right}px`, bottom: `${p.bottom}px` } : { left: '', top: '', right: '', bottom: '' });
+    }
+  };
+  const draggable = (node, key) => {
+    node.addEventListener('mousedown', (e) => { if (!e.button) badgeDrag = { node, key, x: e.clientX, y: e.clientY, r: node.getBoundingClientRect(), moved: false }; });
+    node.addEventListener('click', (e) => { if (node.dataset.dragged) { delete node.dataset.dragged; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  };
+  window.addEventListener('mousemove', (e) => {
+    const d = badgeDrag; if (!d || (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5)) return;
+    d.moved = true;
+    const right = Math.round(Math.min(Math.max(0, innerWidth - d.r.right - (e.clientX - d.x)), innerWidth - d.r.width));
+    const bottom = Math.round(Math.min(Math.max(0, innerHeight - d.r.bottom - (e.clientY - d.y)), innerHeight - d.r.height));
+    Object.assign(d.node.style, { left: 'auto', top: 'auto', right: `${right}px`, bottom: `${bottom}px` });
+  }, true);
+  window.addEventListener('mouseup', () => {
+    const d = badgeDrag; badgeDrag = null; if (!d?.moved) return;
+    d.node.dataset.dragged = '1'; setTimeout(() => delete d.node.dataset.dragged, 300);
+    const look = d.node.classList.contains('is-icon') ? 'icon' : 'full';
+    host.setConfig({ badgePos: { ...badgeCfg.badgePos, [`${d.key}-${look}`]: { right: parseFloat(d.node.style.right), bottom: parseFloat(d.node.style.bottom) } } });
+  }, true);
+  draggable(document.getElementById('listening-stop'), 'mic'); badgeLook();
   let mouse = null;
   const setInteractive = (on) => {
     if (on === interactive) return;
@@ -148,7 +181,7 @@ async function boot() {
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
     if (picker?.open || speechUI?.open || listeningUI?.open || settingsUI?.open || computerUI?.open) return setInteractive(true);
-    if (capri.dragging) return setInteractive(true);
+    if (capri.dragging || badgeDrag) return setInteractive(true);
     if (!mouse) return setInteractive(false);
     const r = panel.rect();
     const onPanel = r && mouse.x >= r.left && mouse.x <= r.right && mouse.y >= r.top && mouse.y <= r.bottom;
@@ -229,6 +262,17 @@ async function boot() {
   window.addEventListener('click', (e) => {
     if (chip.visible && chip.contains(e.clientX, e.clientY, 0)) comeOut();
   });
+  // Ctrl + wheel over her: the next (down) or previous (up) character
+  let wheelAt = 0;
+  window.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey || !capri.hit(e.clientX, e.clientY)) return;
+    e.preventDefault();
+    const list = characters, now = performance.now();
+    if (now - wheelAt < 250 || list.length < 2) return;
+    wheelAt = now;
+    const i = list.findIndex((c) => c.id === capri.character.id);
+    host.setConfig({ characterId: list[(i + (e.deltaY > 0 ? 1 : -1) + list.length) % list.length].id });
+  }, { passive: false });
 
   // wiring
   capri.onMove = (head) => {
@@ -731,10 +775,12 @@ async function boot() {
   });
 
   host.onConfig((cfg) => {
+    badgeCfg = cfg; badgeLook();
     speechUI.configure(cfg);
     listeningUI.realtime.configure(cfg);
     listeningUI.configure(cfg);
     picker?.setCharacters(cfg.characters);
+    characters = cfg.characters || characters;
     picker?.setDisplay(cfg.scale, cfg.characterFraming);
     voice.configure(cfg);
     jealousy.enabled = cfg.jealous !== false;
@@ -775,7 +821,14 @@ async function boot() {
   host.onCommand(async (cmd) => {
     if(cmd.name==='voice-agent-stop'){listeningUI.realtime.stop();return;}
     if (cmd.name === 'listening') { picker.hide(); speechUI.hide(); await listeningUI.show(); return; }
-    if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
+    // from her menu or the hotkey: the mic starts as set, no dialog (it opens only if something's missing)
+    if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.load(); await listeningUI.toggle(); return; }
+    if (cmd.name === 'listening-mode') {
+      if (!listeningUI.settings) await listeningUI.load();
+      listeningUI.stop(); listeningUI.mode.value = cmd.mode;
+      await listeningUI.begin().catch((e) => listeningUI.error(e));
+      return;
+    }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
     if (cmd.name === 'ask-value') { // a value typed in her panel: VIP senders, a routine, LINE
@@ -842,12 +895,12 @@ async function boot() {
         mp = document.createElement('div'); mp.id = 'mini-player'; mp.setAttribute('role', 'region'); mp.setAttribute('aria-label', 'มินิเพลเยอร์');
         mp.innerHTML = '<span class="mp-note" aria-hidden="true">♪</span><span class="mp-text"></span><button type="button" data-a="previous" aria-label="เพลงก่อนหน้า">⏮</button><button type="button" data-a="pause" aria-label="เล่นหรือหยุด">⏯</button><button type="button" data-a="next" aria-label="เพลงถัดไป">⏭</button>';
         for (const ev of ['mousedown', 'mouseup', 'click']) mp.addEventListener(ev, (e) => e.stopPropagation());
-        mp.addEventListener('click', (e) => { const a = e.target.dataset?.a; if (a) host.media(a); });
-        document.body.append(mp);
+        mp.addEventListener('click', (e) => { const a = e.target.dataset?.a || (mp.classList.contains('is-icon') && 'pause'); if (a) host.media(a); });
+        document.body.append(mp); draggable(mp, 'player'); badgeLook();
       }
       const on = Boolean(cmd.title), playing = on && /play/i.test(cmd.status || '');
       mp.hidden = !on; mp.classList.toggle('is-playing', playing);
-      mp.querySelector('.mp-text').textContent = on ? `${cmd.title}${cmd.artist ? ` — ${cmd.artist}` : ''}` : '';
+      mp.querySelector('.mp-text').textContent = mp.title = on ? `${cmd.title}${cmd.artist ? ` — ${cmd.artist}` : ''}` : '';
       clearInterval(window.__uncleMusicDance);
       if (playing) window.__uncleMusicDance = setInterval(() => { if (!capri.busy && !capri.act && !capri.dragging && !capri.hidden && !capri.stowed && !capri.dormant) capri.perform('hop'); }, 1500);
       return;

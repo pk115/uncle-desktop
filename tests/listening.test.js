@@ -176,3 +176,12 @@ test('on macOS the model install downloads only the model (whisper-cli comes fro
     assert.deepEqual(await fs.readdir(directory), ['whisper-cli']);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+test('always-listening mode sends any real command without a wake word, and ignores noise', async () => {
+  const { Listening } = await import('../src/renderer/js/listening.js');
+  const v = Object.create(Listening.prototype);
+  let heard = 'ขอบคุณที่รับชม', sent = [], wakeOnly;
+  Object.assign(v, { serial: 1, stream: {}, settings: { mode: 'always', wakeWords: ['ลุงเดฟ'], review: false }, followUntil: 0, transcript: {}, sendButton: {}, status: {}, indicator: {}, host: { listeningTranscribe: async (_bytes, waking) => { wakeOnly = waking; return { text: heard }; } }, show: async () => {}, idle: () => {}, submit: async () => { sent.push(v.transcript.value); v.pending = false; } });
+  await v.process([]); assert.deepEqual(sent, []); assert.equal(wakeOnly, false);
+  heard = 'อืม'; await v.process([]); assert.deepEqual(sent, []);
+  heard = 'เปิดเพลงแจ๊สหน่อย'; await v.process([]); assert.deepEqual(sent, ['เปิดเพลงแจ๊สหน่อย']);
+});

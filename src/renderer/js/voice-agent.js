@@ -57,7 +57,7 @@ export class VoiceAgent {
  }
  disconnected(details,serial){
   if(serial!==this.serial)return;
-  const rearm=details?.reason==='agent'&&this.selected&&this.listening.settings?.mode==='wake';this.stop();this.listening.setStatus('จบการสนทนา ElevenLabs แล้ว');
+  const rearm=details?.reason==='agent'&&this.selected&&['wake','always'].includes(this.listening.settings?.mode);this.stop();this.listening.setStatus('จบการสนทนา ElevenLabs แล้ว');
   if(rearm){const generation=this.serial,captureSerial=this.listening.serial;setTimeout(()=>{if(generation!==this.serial||captureSerial!==this.listening.serial||!this.selected)return;this.listening.followUntil=0;this.listening.capture(captureSerial).catch(e=>this.listening.error(e));},500);}
  }
  async message(event){
