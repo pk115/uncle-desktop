@@ -863,6 +863,14 @@ function rebuildTray() {
     { type: 'separator' },
     { label: t.talk, click: () => sendCommand('chat') },
     { label: th ? 'เริ่มพูด / ปิดไมค์' : 'Talk / stop mic', accelerator: hotkeys().voice || undefined, click: () => sendCommand('listening-toggle') },
+    // the mic in one of its three ways, started at once
+    { label: th ? 'โหมดไมค์' : 'Mic mode', submenu: [
+      ...[['push', th ? 'กดพูด' : 'Push to talk'], ['wake', th ? 'เรียกชื่อแล้วสั่ง' : 'Wake phrase'], ['always', th ? 'ฟังตลอด' : 'Always listening']].map(([mode, label]) => ({
+        label, type: 'radio', checked: listeningSettings(cfg.listening).mode === mode, click: () => sendCommand('listening-mode', { mode }),
+      })),
+      { type: 'separator' },
+      { label: th ? 'ปิดไมค์' : 'Mic off', click: () => { listening?.stop(); sendCommand('listening-stop'); } },
+    ] },
     { label: t.lookNow, click: () => sendCommand('look') },
     item.quick,
     item.size,

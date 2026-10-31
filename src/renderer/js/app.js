@@ -789,7 +789,14 @@ async function boot() {
   host.onCommand(async (cmd) => {
     if(cmd.name==='voice-agent-stop'){listeningUI.realtime.stop();return;}
     if (cmd.name === 'listening') { picker.hide(); speechUI.hide(); await listeningUI.show(); return; }
-    if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.show(); await listeningUI.toggle(); return; }
+    // from her menu or the hotkey: the mic starts as set, no dialog (it opens only if something's missing)
+    if (cmd.name === 'listening-toggle') { if (!listeningUI.settings) await listeningUI.load(); await listeningUI.toggle(); return; }
+    if (cmd.name === 'listening-mode') {
+      if (!listeningUI.settings) await listeningUI.load();
+      listeningUI.stop(); listeningUI.mode.value = cmd.mode;
+      await listeningUI.begin().catch((e) => listeningUI.error(e));
+      return;
+    }
     if (cmd.name === 'listening-stop') { listeningUI.stop(); return; }
     if (cmd.name === 'characters' || cmd.name === 'speech') { listeningUI.stop(); listeningUI.hide(); }
     if (cmd.name === 'ask-value') { // a value typed in her panel: VIP senders, a routine, LINE
