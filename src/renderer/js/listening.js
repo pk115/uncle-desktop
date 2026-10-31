@@ -72,7 +72,9 @@ export class Listening {
   }
   get open() { return !this.root.hidden; }
   configure(config) { if (this.characterId && config.characterId !== this.characterId || config.visible === false) this.stop(); this.characterId = config.characterId; }
-  setStatus(text) { this.status.textContent = text; if (this.stream) this.indicator.textContent = this.indicator.title = `■ ปิดไมค์ · ${text}`; }
+  setStatus(text) { this.status.textContent = text; if (this.stream) this.indicator.textContent = this.indicator.title = `■ ปิดไมค์ · ${text}`;
+    // which step a command is at, for the small icon: waiting, turning speech into text, doing it
+    if (this.indicator.dataset) this.indicator.dataset.state = this.submitting ? 'work' : this.processing ? 'hear' : 'listen'; }
   error(error) { this.stop(); this.root.hidden = false; this.onVisibility(true); this.setStatus(String(error.message || error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')); }
   async load() {
     const info = await this.host.listeningInfo(); this.settings = info.settings;await this.realtime?.load();

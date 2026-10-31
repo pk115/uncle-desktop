@@ -212,3 +212,13 @@
 #mini-player.is-icon .mp-note { font-size: 20px; }
 @keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px rgba(255, 60, 90, .25); } }
 @media (prefers-reduced-motion: reduce) { .listening-stop.is-icon { animation: none; } }
+/* the mic's step: listening (red), turning speech into text (amber, spinning), doing it (green) */
+.listening-stop[data-state="hear"] { border-left-color: #ffb020; }
+.listening-stop[data-state="work"] { border-left-color: var(--green); }
+.listening-stop.is-icon[data-state="hear"] { border: 2px dashed #ffb020; animation: mic-spin 1.2s linear infinite; }
+.listening-stop.is-icon[data-state="hear"]::before { content: '💬'; display: inline-block; animation: mic-spin 1.2s linear infinite reverse; }
+.listening-stop.is-icon[data-state="work"] { border-color: var(--green); animation: mic-work 0.8s ease-in-out infinite alternate; }
+.listening-stop.is-icon[data-state="work"]::before { content: '⚡'; }
+@keyframes mic-spin { to { transform: rotate(360deg); } }
+@keyframes mic-work { to { box-shadow: 0 0 0 6px rgba(57, 255, 136, .3); } }
+@media (prefers-reduced-motion: reduce) { .listening-stop.is-icon[data-state], .listening-stop.is-icon[data-state]::before { animation: none; } }
