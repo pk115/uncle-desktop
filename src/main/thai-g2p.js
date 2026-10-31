@@ -194,7 +194,9 @@ function thaiRuns(text, { tones = false } = {}) {
     if (last && kind in last) last[kind] += value; else runs.push({ [kind]: value });
   };
   for (const { segment, isWordLike } of segmenter.segment(normalize(text))) {
-    if (!THAI.test(segment)) { if (/\s+/.test(segment) && runs.length && 'thai' in runs[runs.length - 1]) push('thai', ', '); else push('text', segment); continue; }
+    const afterThai = runs.length && 'thai' in runs[runs.length - 1];
+    // spaces and punctuation after Thai stay with it (a pause), not a run of their own
+    if (!THAI.test(segment)) { if (afterThai && !/[\p{L}\p{N}]/u.test(segment)) push('thai', /[?!]/.test(segment) ? segment.trim() + ' ' : ', '); else push('text', segment); continue; }
     if (!isWordLike) { push('thai', ' '); continue; }
     const repeat = segment.endsWith('ๆ');
     const word = segment.replace(/ๆ/g, '');

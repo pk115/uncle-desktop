@@ -127,8 +127,9 @@ let updater = null; // electron-updater, installed copies only
 // her mini player: what's playing (Spotify, a browser, any player Windows or macOS knows), every few
 // seconds, through a computer helper of its own; she hears of it only when it changes
 // (on Windows the window watcher already running tells her, so no second PowerShell)
-let playerNative = null, lastPlaying = '';
+let playerNative = null, lastPlaying = '', playingInfo = null;
 function showPlaying(info) {
+  playingInfo = info;
   const now = JSON.stringify(info?.title && config.load().miniPlayer !== false && overlay ? { title: info.title, artist: info.artist || '', status: info.status } : {});
   if (now !== lastPlaying) { lastPlaying = now; sendCommand('now-playing', JSON.parse(now)); }
 }
@@ -528,6 +529,8 @@ function updateConfig(patch) {
     for (const abort of chats.values()) abort.abort();
     llm.resetClaude();
   }
+  // the watcher only speaks when the song changes: the card follows the switch now
+  if ('miniPlayer' in patch) showPlaying(playingInfo);
   if ('rest' in patch) {
     fitOverlay(); // the taskbar in her window or not
     windowWatch?.refresh();
