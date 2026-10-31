@@ -36,6 +36,20 @@ const RESPELL = {
   เพราะ: 'เพาะ', ทำไม: 'ทำไม', อร่อย: 'อะหร่อย', สบาย: 'สะบาย', สวัสดี: 'สะหวัดดี', ตลาด: 'ตะหลาด', ฉลาด: 'ฉะหลาด',
   สนุก: 'สะหนุก', ขยัน: 'ขะหยัน', อนาคต: 'อะนาคด', ปัจจุบัน: 'ปัดจุบัน', คอมพิวเตอร์: 'คอมพิวเต้อ', โทรศัพท์: 'โทระสับ',
   มือถือ: 'มือถือ', กรุงเทพ: 'กรุงเทบ', ภาษา: 'พาสา', ปรากฏ: 'ปรากด', เสมอ: 'สะเหมอ', สมอง: 'สะหมอง', ถนน: 'ถะหนน',
+  // hidden vowels and leading letters
+  ขนาด: 'ขะหนาด', ฉบับ: 'ฉะบับ', สนาม: 'สะหนาม', ตลอด: 'ตะหลอด', จมูก: 'จะหมูก', ฝรั่ง: 'ฝะหรั่ง', สมุด: 'สะหมุด', ขยะ: 'ขะหยะ',
+  ชนิด: 'ชะนิด', พยายาม: 'พะยายาม', ทหาร: 'ทะหาน', สถานี: 'สะถานี', สถานที่: 'สะถานที่', สไตล์: 'สะไต', ตำรวจ: 'ตำหรวด',
+  อนุญาต: 'อะนุยาด', ปรารถนา: 'ปราดถะหนา', ราชการ: 'ราดชะกาน', คุณภาพ: 'คุนนะพาบ', ผลไม้: 'ผนละไม้', สุขภาพ: 'สุกขะพาบ',
+  ปกติ: 'ปกกะติ', วิทยาศาสตร์: 'วิดทะยาสาด', มหาวิทยาลัย: 'มะหาวิดทะยาลัย', ภาพยนตร์: 'พาบพะยน', ธุรกิจ: 'ทุระกิด',
+  เศรษฐกิจ: 'เสดถะกิด', ประโยชน์: 'ประโหยด', สมบัติ: 'สมบัด', เกียรติ: 'เกียด', พฤหัส: 'พะรึหัด', อาทิตย์: 'อาทิด', จันทร์: 'จัน',
+  // ทร said ซ, ศร/สร said ส
+  ทราบ: 'ซาบ', ทรัพย์: 'ซับ', กระทรวง: 'กระซวง', เศร้า: 'เส้า', สร้อย: 'ส้อย', ศรี: 'สี', เสร็จ: 'เส็ด', จริงจัง: 'จิงจัง',
+  // รร and Sanskrit spellings
+  กรรม: 'กำ', กรรมการ: 'กำมะกาน', พรรค: 'พัก', บรรยากาศ: 'บันยากาด', สัตว์: 'สัด', เพชร: 'เพ็ด', รถยนต์: 'รดยน', รถไฟ: 'รดไฟ',
+  // months
+  มกราคม: 'มะกะราคม', กุมภาพันธ์: 'กุมพาพัน', พฤษภาคม: 'พรึดสะพาคม', กรกฎาคม: 'กะรักกะดาคม', พฤศจิกายน: 'พรึดสะจิกายน',
+  // loanwords
+  อินเทอร์เน็ต: 'อินเทอเน็ด', เว็บไซต์: 'เว็บไซ', ฟุตบอล: 'ฟุดบอน', เบอร์: 'เบอ',
 };
 // the whole word, or a longer word inside a compound (ธรรมชาติ)
 const LONG = Object.keys(RESPELL).filter((k) => k.length > 2).sort((a, b) => b.length - a.length);
@@ -74,7 +88,7 @@ function normalize(text) {
 // one Thai word (no spaces) -> its syllables: { onset, vowel, final, tone }
 function syllables(word) {
   // silent letters (การันต์): the letter (and a vowel on it) under ์ is not read
-  const s = word.replace(/[ก-ฮ][ิุ]?์/g, '');
+  const s = word.replace(/[ก-ฮ][ิุ]?์/g, '').replace(/ฤ/g, 'รึ');
   const out = [];
   let i = 0;
   while (i < s.length) {
@@ -129,7 +143,8 @@ function syllables(word) {
     else if (isC(s[i]) && !startsSyllable(s, i) && !'เแโใไ'.includes(s[i])) vowel = 'o';
     else { vowel = 'a'; canClose = false; }
     let final = '';
-    if (canClose && isC(s[i]) && !startsSyllable(s, i) && !(isC(s[i + 1]) && 'รลว'.includes(s[i + 1]) && startsSyllable(s, i + 1) && 'กขคตปผพ'.includes(s[i]))) {
+    // (not when one lone consonant would be left after it: กายน is กา-ยน, not กาย-นะ)
+    if (canClose && isC(s[i]) && !startsSyllable(s, i) && !(isC(s[i + 1]) && i + 2 === s.length) && !(isC(s[i + 1]) && 'รลว'.includes(s[i + 1]) && startsSyllable(s, i + 1) && 'กขคตปผพ'.includes(s[i]))) {
       final = C[s[i]][1]; i++;
     }
     out.push({ onset, vowel, final, cls, tone: toneOf(cls, vowel, final, tone && TONE_MARK[tone]) });
