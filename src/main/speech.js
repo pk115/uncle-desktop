@@ -9,8 +9,9 @@ const { Worker } = require('node:worker_threads');
 const CLOUD_VOICES = ['coral', 'alloy', 'nova', 'onyx'];
 const EDGE_VOICES = [{ id: 'th-TH-PremwadeeNeural', name: 'เปรมวดี — หญิง', lang: 'th-TH' }, { id: 'th-TH-NiwatNeural', name: 'นิวัฒน์ — ชาย', lang: 'th-TH' }];
 // Kokoro: a free voice model that runs on this computer (English, Japanese, Chinese, Spanish, French,
-// Hindi, Italian, Portuguese; no Thai). Downloaded once (~90 MB) on first use.
-const KOKORO_VOICES = [['af_heart', 'Heart — หญิง US'], ['af_bella', 'Bella — หญิง US'], ['af_nicole', 'Nicole — หญิง US'], ['am_michael', 'Michael — ชาย US'], ['am_fenrir', 'Fenrir — ชาย US'], ['bf_emma', 'Emma — หญิง UK'], ['bm_george', 'George — ชาย UK'], ['jf_alpha', 'Alpha — หญิง ญี่ปุ่น'], ['zf_xiaoxiao', 'Xiaoxiao — หญิง จีน']].map(([id, name]) => ({ id, name, lang: id[0] === 'j' ? 'ja' : id[0] === 'z' ? 'zh' : 'en' }));
+// Hindi, Italian, Portuguese; Thai through thai-g2p.js, with an accent). Downloaded once (~90 MB) on first use.
+const { thaiRuns, THAI } = require('./thai-g2p');
+const KOKORO_VOICES = [['af_heart', 'Heart — หญิง US'], ['af_bella', 'Bella — หญิง US'], ['af_nicole', 'Nicole — หญิง US'], ['am_michael', 'Michael — ชาย US'], ['am_fenrir', 'Fenrir — ชาย US'], ['bf_emma', 'Emma — หญิง UK'], ['bm_george', 'George — ชาย UK'], ['jf_alpha', 'Alpha — หญิง ญี่ปุ่น'], ['zf_xiaoxiao', 'Xiaoxiao — หญิง จีน'], ['zf_xiaobei', 'Xiaobei — หญิง จีน']].map(([id, name]) => ({ id, name, lang: id[0] === 'j' ? 'ja' : id[0] === 'z' ? 'zh' : 'en' }));
 const PROVIDERS = ['windows', 'edge', 'openai', 'elevenlabs', 'fish', 'kokoro', 'custom'];
 // on this computer: nothing leaves it, no consent to ask for
 const local = (s) => s.provider === 'windows' || s.provider === 'kokoro' || (s.provider === 'custom' && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(s.customUrl));
@@ -30,14 +31,29 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
     kokoroWorker = new Worker(`
       const { parentPort, workerData } = require('node:worker_threads');
       let tts = null;
-      parentPort.on('message', async ({ id, text, voice, speed }) => {
+      // Thai comes as phonemes (thai-g2p.js): read out piece by piece, Kokoro takes ~500 at a time
+      const say = async (run, voice, speed) => {
+        if (!('thai' in run)) return (await tts.generate(run.text, { voice, speed })).audio;
+        const parts = [], pieces = run.thai.match(/.{1,380}(?:,\s|$)|.{1,380}/g) || [];
+        for (const ph of pieces) parts.push((await tts.generate_from_ids(tts.tokenizer(ph, { truncation: true }).input_ids, { voice, speed: speed * 0.9 })).audio);
+        return joined(parts);
+      };
+      const joined = (parts) => { const all = new Float32Array(parts.reduce((n, p) => n + p.length, 0)); let at = 0; for (const p of parts) { all.set(p, at); at += p.length; } return all; };
+      parentPort.on('message', async ({ id, text, runs, voice, speed }) => {
         try {
           if (!tts) {
             const { env } = require(workerData.transformers); env.cacheDir = workerData.cacheDir;
             const { KokoroTTS } = require(workerData.kokoro);
             tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' });
           }
-          const audio = await tts.generate(text, { voice, speed });
+          let audio;
+          if (!runs) audio = await tts.generate(text, { voice, speed });
+          else {
+            const parts = [];
+            for (const run of runs) parts.push(await say(run, voice, speed));
+            const { RawAudio } = require(workerData.transformers);
+            audio = new RawAudio(joined(parts), 24000);
+          }
           parentPort.postMessage({ id, audio: Buffer.from(audio.toWav()).toString('base64') });
         } catch (error) { parentPort.postMessage({ id, error: String(error.message || error) }); }
       });
@@ -50,7 +66,8 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
     const done = (msg) => { if (msg.id !== id) return; worker.off('message', done); signal.removeEventListener('abort', abort); msg.error ? reject(new Error(`Kokoro สร้างเสียงไม่สำเร็จ: ${msg.error.slice(0, 120)}`)) : resolve({ audio: msg.audio }); };
     const abort = () => { worker.off('message', done); reject(new Error('หยุดเสียงแล้ว')); };
     worker.on('message', done); signal.addEventListener('abort', abort, { once: true });
-    worker.postMessage({ id, text, voice, speed: rate });
+    // Chinese voices also get each Thai syllable's tone
+    worker.postMessage({ id, text, runs: THAI.test(text) ? thaiRuns(text, { tones: voice[0] === 'z' }) : null, voice, speed: rate });
   });
 }
 // a voice service's answer, as audio bytes for the renderer

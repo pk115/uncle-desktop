@@ -32,7 +32,7 @@ export class Speech {
     const close = node('button', '✕'); close.type = 'button'; close.className = 'speech-close'; close.setAttribute('aria-label', 'ปิดหน้าตั้งค่าเสียง'); close.onclick = () => this.hide();
     const providerLabel = node('label', 'เลือกบริการเสียง');
     this.provider = node('select'); this.provider.id = 'speech-provider'; providerLabel.htmlFor = this.provider.id;
-    for (const [id, label] of [['edge', 'เสียงไทย Edge — ออนไลน์ ไม่ต้องใส่คีย์'], ['windows', 'เสียงของเครื่อง (Windows / macOS) — อ่านในเครื่อง'], ['kokoro', 'Kokoro — เสียง AI ฟรีในเครื่อง (ยังไม่มีภาษาไทย)'], ['openai', 'OpenAI — เสียง AI ออนไลน์'], ['elevenlabs', 'ElevenLabs — เสียง AI ออนไลน์ รองรับไทย'], ['fish', 'Fish Audio — เสียง AI ออนไลน์ / เสียงที่โคลนไว้'], ['custom', 'เซิร์ฟเวอร์หรือโมเดลเสียงของคุณ (OpenAI-compatible)']]) { const option = node('option', label); option.value = id; this.provider.append(option); }
+    for (const [id, label] of [['edge', 'เสียงไทย Edge — ออนไลน์ ไม่ต้องใส่คีย์'], ['windows', 'เสียงของเครื่อง (Windows / macOS) — อ่านในเครื่อง'], ['kokoro', 'Kokoro — เสียง AI ฟรีในเครื่อง (ไทยแบบทดลอง)'], ['openai', 'OpenAI — เสียง AI ออนไลน์'], ['elevenlabs', 'ElevenLabs — เสียง AI ออนไลน์ รองรับไทย'], ['fish', 'Fish Audio — เสียง AI ออนไลน์ / เสียงที่โคลนไว้'], ['custom', 'เซิร์ฟเวอร์หรือโมเดลเสียงของคุณ (OpenAI-compatible)']]) { const option = node('option', label); option.value = id; this.provider.append(option); }
     this.voice = node('select'); this.voice.id = 'speech-voice';
     const voiceLabel = node('label', 'เสียงที่ใช้'); voiceLabel.htmlFor = this.voice.id;
     this.note = node('p');
@@ -137,7 +137,7 @@ export class Speech {
     const keyNote = this.info.hasKeys?.[p] ? ' · มีคีย์บันทึกไว้แล้ว' : p === 'custom' ? '' : ' · ยังไม่มีคีย์';
     this.note.textContent = local ? (voices.some((v) => /^th/i.test(v.lang)) ? 'พบเสียงภาษาไทย อ่านได้โดยไม่ส่งข้อความออกจากเครื่อง' : 'ยังไม่พบเสียงภาษาไทย ติดตั้งเสียงไทยในเครื่อง หรือเลือกเสียงไทย Edge ที่ใช้ได้ทันทีผ่านอินเทอร์เน็ต')
       : edge ? 'เสียงไทยพร้อมใช้ผ่าน Microsoft Edge TTS · ต้องใช้อินเทอร์เน็ต · ไม่ต้องใส่ API key'
-        : kokoro ? 'ทำงานในเครื่อง ไม่ส่งข้อความออกไป ครั้งแรกดาวน์โหลดโมเดลประมาณ 90 MB · อ่านภาษาอังกฤษ ญี่ปุ่น จีน และอีกบางภาษา ยังไม่รองรับภาษาไทย'
+        : kokoro ? 'ทำงานในเครื่อง ไม่ส่งข้อความออกไป ครั้งแรกดาวน์โหลดโมเดลประมาณ 90 MB · อ่านภาษาอังกฤษ ญี่ปุ่น จีน และอีกบางภาษา · ภาษาไทยแบบทดลอง: ฟังรู้เรื่องแต่สำเนียงต่างชาติ เสียงจีนมีวรรณยุกต์ใกล้ไทยกว่า'
           : `ส่งข้อความไป ${NAME} เพื่อสร้างเสียง${keyNote}`;
   }
   async show() { this.root.hidden = false; this.status.textContent = ''; this.onVisibility(true); await this.load(); this.provider.focus(); }
