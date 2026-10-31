@@ -91,7 +91,7 @@
         "!node_modules/onnxruntime-node/bin/napi-v*/darwin/**"
       ],
       "target": "nsis",
-      "icon": "assets/icons/capri.ico"
+      "icon": "assets/icons/uncle.ico"
     },
     "mac": {
       "target": [
@@ -103,7 +103,7 @@
           ]
         }
       ],
-      "icon": "assets/icons/capri-512.png",
+      "icon": "assets/icons/uncle-512.png",
       "files": [
         "!node_modules/onnxruntime-node/bin/napi-v*/win32/**"
       ],
