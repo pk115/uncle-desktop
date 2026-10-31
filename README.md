@@ -307,6 +307,7 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
+| **0.20.3** | Fixes from a full review: mic stuck deaf, two mic captures, Kokoro hanging 3 min after a crash, computer dialog popping back after stop, badges off screen, failed daily jobs not retried, news lost when a summary failed, Codex not really stopped on Windows, window watcher giving up for good, ก็ misread |
 | **0.20.2** | Fix: the character never appeared in 0.20.0–0.20.1 (a file left out of a commit); the mini player switch applies at once; Kokoro keeps punctuation with Thai |
 | **0.20.1** | App icon: UncleDev instead of Capri |
 | **0.20.0** | Kokoro speaks Thai (experimental), always-listening mode, Mic mode menu, small draggable mic and player icons that show the step, Ctrl+wheel to switch characters, fix for dialogs that stopped taking clicks, Thai song titles, ~80 MB less memory |
