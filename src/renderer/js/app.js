@@ -139,7 +139,8 @@ async function boot() {
       const look = badgeCfg.badges?.[key] === 'icon' ? 'icon' : 'full';
       node.classList.toggle('is-icon', look === 'icon');
       const p = badgeCfg.badgePos?.[`${key}-${look}`];
-      Object.assign(node.style, p ? { left: 'auto', top: 'auto', right: `${p.right}px`, bottom: `${p.bottom}px` } : { left: '', top: '', right: '', bottom: '' });
+      // kept on screen: a place saved on a bigger display
+      Object.assign(node.style, p ? { left: 'auto', top: 'auto', right: `${Math.min(p.right, innerWidth - 48)}px`, bottom: `${Math.min(p.bottom, innerHeight - 48)}px` } : { left: '', top: '', right: '', bottom: '' });
     }
   };
   const draggable = (node, key) => {
@@ -768,6 +769,7 @@ async function boot() {
     goToScreen(at.display);
   };
   window.addEventListener('resize', () => {
+    badgeLook();
     fx.resize(innerWidth, innerHeight);
     chip.place(innerWidth, innerHeight - floorGap);
     capri.setView(innerWidth, innerHeight, innerHeight - floorGap);

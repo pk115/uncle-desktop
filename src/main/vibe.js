@@ -108,7 +108,9 @@ function createVibe({ getSettings, saveState, getState, approveScript, nodePath 
   function stop(name) {
     const child = jobs.get(name);
     if (!child) return false;
-    child.kill();
+    // Windows starts codex through cmd: kill the whole tree, not just cmd
+    if (process.platform === 'win32' && child.pid) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }).on('error', () => child.kill());
+    else child.kill();
     return true;
   }
 

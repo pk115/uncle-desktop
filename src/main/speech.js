@@ -66,12 +66,16 @@ function kokoroSynthesize(text, voice, rate, signal, cacheDir) {
       });
     `, { eval: true, workerData: { cacheDir, kokoro: require.resolve('kokoro-js'), phonemizer: require.resolve('phonemizer'), transformers: require.resolve('@huggingface/transformers') } });
     kokoroWorker.on('error', () => { kokoroWorker = null; });
+    kokoroWorker.on('exit', () => { kokoroWorker = null; });
     kokoroWorker.unref();
   }
   const worker = kokoroWorker, id = Math.random().toString(36).slice(2);
   return new Promise((resolve, reject) => {
-    const done = (msg) => { if (msg.id !== id) return; worker.off('message', done); signal.removeEventListener('abort', abort); msg.error ? reject(new Error(`Kokoro สร้างเสียงไม่สำเร็จ: ${msg.error.slice(0, 120)}`)) : resolve({ audio: msg.audio }); };
-    const abort = () => { worker.off('message', done); reject(new Error('หยุดเสียงแล้ว')); };
+    // the worker dying (an error, out of memory) ends this line too, instead of 3 minutes of silence
+    const dead = () => { worker.off('message', done); signal.removeEventListener('abort', abort); reject(new Error('Kokoro หยุดทำงาน ลองอีกครั้ง')); };
+    worker.once('exit', dead);
+    const done = (msg) => { if (msg.id !== id) return; worker.off('message', done); worker.off('exit', dead); signal.removeEventListener('abort', abort); msg.error ? reject(new Error(`Kokoro สร้างเสียงไม่สำเร็จ: ${msg.error.slice(0, 120)}`)) : resolve({ audio: msg.audio }); };
+    const abort = () => { worker.off('message', done); worker.off('exit', dead); reject(new Error('หยุดเสียงแล้ว')); };
     worker.on('message', done); signal.addEventListener('abort', abort, { once: true });
     // Chinese voices also get each Thai syllable's tone
     worker.postMessage({ id, text, runs: THAI.test(text) ? thaiRuns(text, { tones: voice[0] === 'z' }) : null, voice, speed: rate });
