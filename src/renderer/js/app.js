@@ -10,6 +10,7 @@ import { Chat } from './chat.js';
 import { Setup } from './setup.js';
 import { Custom } from './custom.js';
 import { CharacterPicker } from './character-picker.js';
+import { loadCharacterSource } from './character-assets.js';
 import { Speech } from './speech.js';
 import { Listening } from './listening.js';
 import { VoiceAgent } from './voice-agent.js';
@@ -45,13 +46,14 @@ const mine = (cfg) => ({ userName: cfg.userName || '', persona: cfg.persona || '
 
 async function boot() {
   const config = await host.getConfig();
+  let characters = config.characters || [];
   let picker = null;
   let speechUI = null;
   let listeningUI = null;
   let settingsUI = null;
   let computerUI = null;
   const loadCharacter = (character) => Promise.all([
-    loadImage(characterAsset(character, 'atlas')),
+    loadCharacterSource(character),
     loadImage(characterAsset(character, 'portrait')),
   ]);
   const [image, portrait] = await loadCharacter(config.character);
@@ -229,6 +231,17 @@ async function boot() {
   window.addEventListener('click', (e) => {
     if (chip.visible && chip.contains(e.clientX, e.clientY, 0)) comeOut();
   });
+  // Ctrl + wheel over her: the next (down) or previous (up) character
+  let wheelAt = 0;
+  window.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey || !capri.hit(e.clientX, e.clientY)) return;
+    e.preventDefault();
+    const list = characters, now = performance.now();
+    if (now - wheelAt < 250 || list.length < 2) return;
+    wheelAt = now;
+    const i = list.findIndex((c) => c.id === capri.character.id);
+    host.setConfig({ characterId: list[(i + (e.deltaY > 0 ? 1 : -1) + list.length) % list.length].id });
+  }, { passive: false });
 
   // wiring
   capri.onMove = (head) => {
@@ -735,6 +748,7 @@ async function boot() {
     listeningUI.realtime.configure(cfg);
     listeningUI.configure(cfg);
     picker?.setCharacters(cfg.characters);
+    characters = cfg.characters || characters;
     picker?.setDisplay(cfg.scale, cfg.characterFraming);
     voice.configure(cfg);
     jealousy.enabled = cfg.jealous !== false;
