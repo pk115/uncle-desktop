@@ -21,6 +21,7 @@
 ## Contents
 
 - [Install](#install)
+- **[Full user manual (Thai)](docs/MANUAL_TH.md)**
 - [Features](#features)
   - [Characters](#-characters)
   - [Life on your desktop](#-life-on-your-desktop)
@@ -67,6 +68,7 @@ Get them from **[Releases](https://github.com/pk115/uncle-desktop/releases/lates
 - Each one has their own personality, lines and poses
 - **View:** full body, or upper body to see their face
 - **Size:** several sizes to choose from
+- **Quick switch:** point at her, hold Ctrl and turn the mouse wheel: down for the next character, up for the previous one
 - **Import your own:** from your own atlas image. See [CHARACTERS.md](docs/CHARACTERS.md) and [ADD_YOUR_CHARACTER.md](docs/ADD_YOUR_CHARACTER.md)
 
 ### 🏙 Life on your desktop
@@ -102,7 +104,7 @@ Get them from **[Releases](https://github.com/pk115/uncle-desktop/releases/lates
 |---|---|:-:|---|
 | Your computer's voices | locally | ✓ if installed | Windows SAPI or macOS `say` |
 | Edge TTS | online | ✓ | Premwadee / Niwat, no key |
-| **Kokoro** | **locally, free** | ✗ | English, Japanese, Chinese and more; ~90 MB model downloaded once |
+| **Kokoro** | **locally, free** | experimental | English, Japanese, Chinese and more, plus **experimental Thai** (understandable, with an accent); ~90 MB model downloaded once |
 | OpenAI | online | ✓ | API key |
 | ElevenLabs | online | ✓ | eleven_v3, any Voice ID |
 | Fish Audio | online | ✓ | your cloned voices too |
@@ -114,10 +116,16 @@ Get them from **[Releases](https://github.com/pk115/uncle-desktop/releases/lates
   - Glitch: short dropouts
   - Layers: two more copies of her voice, one higher, one lower
 - **Reads chat replies aloud** if you want, with her mouth moving to her voice
+- **Kokoro reads Thai:** Thai text becomes phonemes through Thai spelling rules on your computer (word breaks, leading letters, clusters, numbers, times, ~130 irregular words); the Chinese voices (Xiaoxiao, Xiaobei) also get Thai tones, so they sound the most Thai
 
 ### 🎙 Voice commands
 
-- **Listening:** push-to-talk (Ctrl+Alt+V), or a wake phrase you set, such as "เฮ้ อังเคิล", checked on your computer
+- **Three ways to listen:**
+  - **Push to talk:** Ctrl+Alt+V, then speak
+  - **Wake phrase:** one you set, such as "เฮ้ อังเคิล", checked on your computer
+  - **Always listening:** speak any time, no wake phrase; noise and one-word sounds are dropped
+- **Quick mode switch:** right-click › Mic mode starts listening that way at once, no dialog
+- **Mic status:** a full bar, or a small icon bottom right that you can drag; the icon shows the step: 🎙 listening · 💬 turning speech into text · ⚡ doing it
 - **Speech to text:**
   - Local Whisper: small, or Thonburian medium tuned for Thai
   - Gemini or OpenAI
@@ -207,7 +215,8 @@ Done right away, without a multi-step job:
 
 ### 🎵 Music and the mini player
 
-- **Mini player:** bottom right, shows what's playing in Spotify, a browser or any player your system knows, with ⏮ ⏯ ⏭
+- **Mini player:** bottom right, shows what's playing (Thai titles too) in Spotify, a browser or any player your system knows, with ⏮ ⏯ ⏭
+- **Full or a small ♪ icon:** Settings › Voice; drag it anywhere, its place is remembered; click the icon to play or pause, hover for the song
 - **Dancing:** she dances while music plays
 - Turn it on or off in Settings › Behavior
 
@@ -252,6 +261,7 @@ Hooks for **Claude Code**, **Codex** and **Antigravity**:
 | Keys | What |
 |---|---|
 | `Ctrl+Alt+V` | talk, or turn the mic off |
+| `Ctrl` + mouse wheel over her | switch character |
 | `Ctrl+Alt+M` | mute |
 | `Ctrl+Alt+C` | into her biochip, or back out |
 | `Ctrl+Alt+X` | stop computer control |
@@ -297,6 +307,7 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
+| **0.20.0** | Kokoro speaks Thai (experimental), always-listening mode, Mic mode menu, small draggable mic and player icons that show the step, Ctrl+wheel to switch characters, fix for dialogs that stopped taking clicks, Thai song titles, ~80 MB less memory |
 | **0.19.0** | Telegram (text, voice, photos, video), Vibecode from your phone with Claude Code / Codex, news topics and briefs, local tasks, VIP mail, follow-ups, meeting prep, timed routines, remote PC control with PIN, LINE alerts |
 | **0.18.0** | Personal assistant: MCP servers (Claude Code's mcp.json), Gmail and Google Calendar, alerts for important mail and meetings; tools that write ask first |
 | 0.17.1 | Fix: dialogs that sometimes stopped taking clicks; size, full/upper body and AI model in the right-click menu |
