@@ -354,10 +354,13 @@ function fitOverlay() {
 // The pointer reaches her click-through window through a mouse hook, and Windows drops a hook that
 // doesn't answer in time without a word (waking from sleep, a locked screen, a stall): she can't be
 // clicked anymore. Off then on puts in a new one; her place on top and her size are set again too.
+// Back to what the renderer last asked for: always click-through here, and it believed she was
+// clickable (a dialog open, the pointer on her) and never asked again: nothing could be clicked.
+let overlayInteractive = false;
 function rearmOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
   overlay.setIgnoreMouseEvents(false);
-  overlay.setIgnoreMouseEvents(true, { forward: true });
+  overlay.setIgnoreMouseEvents(!overlayInteractive, { forward: true });
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
     callback(contents === overlay?.webContents && contents.getURL().startsWith('capri://app/') && permission === 'media' && details.mediaTypes?.length > 0 && details.mediaTypes.every(type => type === 'audio'));
@@ -409,6 +412,8 @@ function createOverlay() {
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // a fresh page (a reload, a crash) starts click-through, believing so too
+  overlay.webContents.on('did-start-loading', () => { overlayInteractive = false; overlay.setIgnoreMouseEvents(true, { forward: true }); });
   // macOS: on every Space, over full-screen apps too, as she is over everything on Windows
   if (process.platform === 'darwin') overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
@@ -1382,6 +1387,7 @@ ${state.evidence}` : ''}` }); }
     return true;
   });
   ipcMain.on('overlay:interactive', (_e, on) => {
+    overlayInteractive = Boolean(on);
     overlay?.setIgnoreMouseEvents(!on, { forward: true });
   });
   ipcMain.on('overlay:rearm', () => rearmOverlay()); // the pointer moved over her and she never heard of it
