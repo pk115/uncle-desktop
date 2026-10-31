@@ -307,6 +307,7 @@ Publishing a release makes GitHub Actions build the Mac `.dmg` files and attach 
 
 | Version | What's new |
 |---|---|
+| **0.20.1** | App icon: UncleDev instead of Capri |
 | **0.20.0** | Kokoro speaks Thai (experimental), always-listening mode, Mic mode menu, small draggable mic and player icons that show the step, Ctrl+wheel to switch characters, fix for dialogs that stopped taking clicks, Thai song titles, ~80 MB less memory |
 | **0.19.0** | Telegram (text, voice, photos, video), Vibecode from your phone with Claude Code / Codex, news topics and briefs, local tasks, VIP mail, follow-ups, meeting prep, timed routines, remote PC control with PIN, LINE alerts |
 | **0.18.0** | Personal assistant: MCP servers (Claude Code's mcp.json), Gmail and Google Calendar, alerts for important mail and meetings; tools that write ask first |
