@@ -8,6 +8,8 @@
 
 param([long]$Self = 0, [int]$ParentPid = 0)
 $ErrorActionPreference = 'Stop'
+# UTF-8 out: song titles in Thai (or any language) would come out as ????
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition @"
 using System;
