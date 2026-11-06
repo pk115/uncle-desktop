@@ -182,6 +182,25 @@ test('Tama action packs provide full and bust tracks without losing existing pos
   }
 });
 
+test('Pudding action packs provide full and bust tracks at both resolutions',async()=>{
+  const fs=require('node:fs');
+  const {validateManifest}=await load('character-assets.js');
+  const {trackFrame}=await load('character-rig.js');
+  const c=require('../assets/characters/catalog.json').find(c=>c.id==='pudding');
+  for(const file of [c.spriteManifest,c.bustManifest]){
+    const m=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',file))));
+    assert.deepEqual(m.variants.map(v=>v.frameWidth),[320,640]);
+    for(const {layers:[layer]} of m.variants){
+      assert.equal(layer.frames.length,39);assert.equal(layer.tracks.wake.length,3);
+      for(const name of ['walk','sit','perch_arrive','arrive','held','dance'])assert.equal(layer.tracks[name].length,4,name);
+      assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
+      assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'held',actionFps:c.actionFps}),layer.tracks.held[1]);
+      assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'stand',dance:true,actionFps:c.actionFps}),layer.tracks.dance[1]);
+      assert.ok(layer.tracks.talk?.length);
+    }
+  }
+});
+
 test('UncleDev and Blacky action packs retain original states and cropped views',async()=>{
   const fs=require('node:fs');
   const {validateManifest}=await load('character-assets.js');
@@ -229,7 +248,7 @@ test('available idle actions are equally likely and never randomly select dancin
   const {Capri}=await load('capri.js');
   const previous=Math.random;
   try {
-    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['luna',{},['sit','peek','teleport','flourish','walk']],['tama',{},['sit','peek','teleport','flourish','walk']],['angry-boy',{},['sit','peek','teleport','flourish','walk']],['blacky',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
+    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['luna',{},['sit','peek','teleport','flourish','walk']],['tama',{},['sit','peek','teleport','flourish','walk']],['angry-boy',{},['sit','peek','teleport','flourish','walk']],['blacky',{},['sit','peek','teleport','flourish','walk']],['pudding',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
       for(let i=0;i<expected.length;i++) {
         let action='';Math.random=()=>(i+.5)/expected.length;
         const actor={wander:true,locked:false,stance:'stand',fondness:0,character:{id,renderer:id==='capri'?'capri':undefined},
@@ -265,6 +284,7 @@ test('dancing requires an actively playing media session',async()=>{
   actor.character.id='tama';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='angry-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='blacky';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='pudding';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
