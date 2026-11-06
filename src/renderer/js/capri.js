@@ -431,7 +431,7 @@ export class Capri {
     this.animate(now);
     const reaction = now < (this.reactionUntil || 0) ? this.reaction : '';
     this.sprite.draw(this.p, { mode: this.mode, act: this.act?.player.name, reaction, talk: this.talk?.() || 0,
-      dance:!!this.musicDance && !this.busy && !this.dragging && !this.hidden && !this.stowed && !this.dormant && (this.stance==='stand' || ((this.character.renderer === 'capri' || ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man'].includes(this.character.id)) && this.stance === 'sit')),
+      dance:!!this.musicDance && !this.busy && !this.dragging && !this.hidden && !this.stowed && !this.dormant && (this.stance==='stand' || ((this.character.renderer === 'capri' || ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man','lazy-boy'].includes(this.character.id)) && this.stance === 'sit')),
       clip: this.characterWalking ? 'walk' : (!this.musicDance && ['dance','perch_dance'].includes(this.capriAmbient?.name) ? undefined : this.capriAmbient?.name),
       lineTalking: this.lineTalking, talkLine: this.talkLine, talkStarted: this.talkStarted,
       position: this.pos, stance: this.stance, moving: this.stance === 'fly',
@@ -580,7 +580,7 @@ export class Capri {
       const seat = this.pickSeat();
       if (seat) actions.push(() => this.sitOn(seat));
       actions.push(() => this.peek(), () => this.teleport(this.spot('random')), () => this.flourish());
-      if (this.stance === 'stand' && ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man'].includes(this.character.id)) actions.push(() => this.characterStroll());
+      if (this.stance === 'stand' && ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man','lazy-boy'].includes(this.character.id)) actions.push(() => this.characterStroll());
       else if (this.stance === 'stand' && this.character.renderer === 'capri') actions.push(() => this.capriStroll());
     }
     pick(actions)();
