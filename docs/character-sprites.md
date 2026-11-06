@@ -14,6 +14,7 @@ Active packs in catalog.json (source 0.23.10, checked 2026-11-01):
 | Blacky | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Bald Man | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Lazy Boy | 55 | none; renderer crops full-body art | 320x420, 640x840 |
+| Angry Guy | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Pudding | 39 | 39 | 320x420, 640x840 |
 | Peegee | 40 | none; renderer crops full-body art | 320x420, 640x840 |
 
@@ -65,6 +66,8 @@ Peegee's `action-v1` retains 12 original frames and adds four each for side-prof
 Bald Man's `action-v1` retains 30 original frames and adds four each for walking, sitting, waking, seated and standing greetings, held and standing dance. Walking is mirrored and departures reverse greetings. Bust uses the full-body crop; seated dancing uses procedural movement. Rebuild with `tools/package-bald-man-motion.py` and `../character-sources/bald-man-motion-v1`.
 
 Lazy Boy's `action-v1` retains 30 original frames and adds four each for walking, waking, seated and standing greetings, held and standing dance, plus one seated still from the seated greeting. Walking is mirrored and departures reverse greetings. Bust uses the full-body crop; seated dancing uses procedural movement. Rebuild with `tools/package-lazy-boy-motion.py` and `../character-sources/lazy-boy-motion-v1`.
+
+Angry Guy's `action-v1` retains 30 original frames and adds four each for walking, sitting, waking, seated and standing greetings, held and standing dance. Walking is mirrored and departures reverse greetings. Bust uses the full-body crop; seated dancing uses procedural movement. Rebuild with `tools/package-angry-guy-motion.py` and `../character-sources/angry-guy-motion-v1`.
 
 In 0.23.1, Mochi randomly chooses among three coherent ambient paths and three speech paths, excluding the last-used path and varying dwell times. `idleMotion` and `thinkingMotion` map the ambient indices to authored frames. Speech and important states take priority. Mochi's torso uses a calibrated impulse of 45 (previously 32) and visual gain 1.6; the existing gradient/foldover clamps still apply.
 

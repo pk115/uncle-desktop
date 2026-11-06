@@ -205,7 +205,7 @@ test('Classic action packs retain original states and cropped views',async()=>{
   const fs=require('node:fs');
   const {validateManifest}=await load('character-assets.js');
   const {trackFrame}=await load('character-rig.js');
-  for(const id of ['angry-boy','blacky','bald-man','lazy-boy']) {
+  for(const id of ['angry-boy','blacky','bald-man','lazy-boy','angry-guy']) {
     const c=require('../assets/characters/catalog.json').find(c=>c.id===id);
     const m=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',c.spriteManifest))));
     const base=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',id,'motion-full/manifest.json'))));
@@ -303,6 +303,7 @@ test('dancing requires an actively playing media session',async()=>{
   actor.character.id='peegee';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='bald-man';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='lazy-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='angry-guy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
