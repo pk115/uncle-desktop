@@ -381,3 +381,20 @@ test('Luna uses the new face for both views and every expression and speech trac
     }
   }
 });
+
+test('Mira has separate full and bust atlases with playable action tracks', async()=>{
+  const fs=require('node:fs');
+  const mira=require('../assets/characters/catalog.json').find(c=>c.id==='mira');
+  const {validateManifest}=await load('character-assets.js');
+  for(const key of ['spriteManifest','bustManifest']) {
+    const file=path.join(__dirname,'../assets/characters',mira[key]);
+    const manifest=validateManifest(JSON.parse(fs.readFileSync(file)));
+    assert.equal(manifest.crop.width, key==='spriteManifest' ? 320 : 156);
+    for(const variant of manifest.variants) {
+      for(const action of ['walk','sit','wake','arrive','leave','perch_arrive','perch_leave','held','dance']) {
+        assert.ok(variant.layers[0].tracks[action]?.length >= 3, `${key}/${action}`);
+      }
+      for(const page of variant.pages)assert.ok(fs.statSync(path.join(path.dirname(file),page.file)).size>1000);
+    }
+  }
+});
