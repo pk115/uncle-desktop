@@ -11,6 +11,7 @@ Active packs in catalog.json (source 0.23.10, checked 2026-11-01):
 | Luna | 30 | 30 | 320x420, 640x840 |
 | Tama | 40 | 40 | 320x420, 640x840 |
 | UncleDev | 58 | none; renderer crops full-body art | 320x420, 640x840 |
+| Blacky | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Pudding | 12 | 12 | 320x420, 640x840 |
 | Peegee | 12 | none; renderer crops full-body art | 320x420, 640x840 |
 
@@ -52,6 +53,8 @@ Luna's `action-v1` packs retain the reference-matched 12 frames and add four sid
 Tama's `action-v1` packs retain the 12 existing frames and add four frames each for side-profile walking, sitting, waking, seated greeting, standing greeting, being held, and standing dance. Departure reverses greeting frames and walking is mirrored. Held artwork follows existing drag physics; standing dance requires music and seated dance uses the seated sequence with procedural movement. Bust action frames are cropped and enlarged from full-body artwork. Rebuild with `tools/package-tama-motion.py` and `../character-sources/tama-motion-v1`.
 
 UncleDev's `action-v1` retains 30 original frames and adds four each for walking, sitting, waking, seated greeting, standing greeting, held and standing dance. Walking is mirrored and departures reverse the greetings. The existing full-body crop and derived bust view are retained; seated dancing uses the sitting sequence with procedural movement. Rebuild with `tools/package-uncledev-motion.py` and `../character-sources/uncledev-motion-v1`.
+
+Blacky's `action-v1` retains 30 original frames and adds four each for side-profile walking, sitting, waking, seated greeting, standing greeting, held and standing dance. Walking is mirrored and departures reverse the greetings. The bust view uses a crop of full-body art; seated dancing uses the sitting sequence with procedural movement. Rebuild with `tools/package-blacky-motion.py` and `../character-sources/blacky-motion-v1`.
 
 In 0.23.1, Mochi randomly chooses among three coherent ambient paths and three speech paths, excluding the last-used path and varying dwell times. `idleMotion` and `thinkingMotion` map the ambient indices to authored frames. Speech and important states take priority. Mochi's torso uses a calibrated impulse of 45 (previously 32) and visual gain 1.6; the existing gradient/foldover clamps still apply.
 
