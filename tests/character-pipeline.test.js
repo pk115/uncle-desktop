@@ -222,6 +222,21 @@ test('UncleDev and Blacky action packs retain original states and cropped views'
   }
 });
 
+test('Peegee action pack retains existing poses and provides motion tracks',async()=>{
+  const fs=require('node:fs'),{validateManifest}=await load('character-assets.js'),{trackFrame}=await load('character-rig.js');
+  const c=require('../assets/characters/catalog.json').find(c=>c.id==='peegee');
+  const m=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',c.spriteManifest))));
+  assert.deepEqual(m.variants.map(v=>v.frameWidth),[320,640]);
+  for(const {layers:[layer]} of m.variants){
+    assert.equal(layer.frames.length,40);
+    for(const name of ['walk','sit','wake','perch_arrive','arrive','held','dance'])assert.equal(layer.tracks[name].length,4,name);
+    assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
+    assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'held',actionFps:c.actionFps}),layer.tracks.held[1]);
+    assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'stand',dance:true,actionFps:c.actionFps}),layer.tracks.dance[1]);
+    assert.ok(layer.tracks.talk?.length);
+  }
+});
+
 test('Mochi walks in both directions and stops for interaction or reduced motion',async()=>{
   global.matchMedia ??= () => ({matches:false,addEventListener(){}});
   const {Capri}=await load('capri.js');
@@ -285,6 +300,7 @@ test('dancing requires an actively playing media session',async()=>{
   actor.character.id='angry-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='blacky';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='pudding';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='peegee';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });

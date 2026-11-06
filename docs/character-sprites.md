@@ -13,7 +13,7 @@ Active packs in catalog.json (source 0.23.10, checked 2026-11-01):
 | UncleDev | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Blacky | 58 | none; renderer crops full-body art | 320x420, 640x840 |
 | Pudding | 39 | 39 | 320x420, 640x840 |
-| Peegee | 12 | none; renderer crops full-body art | 320x420, 640x840 |
+| Peegee | 40 | none; renderer crops full-body art | 320x420, 640x840 |
 
 These counts describe the active whole-image layer in each manifest, not every older pack left in the asset directory. They do not imply independent eyes, mouth or hands. Audio switches between authored whole-frame poses; it is not phoneme lip sync. Storage dimensions do not imply that every figure fills its canvas or has native detail at that entire size. No current 960x1260 native-detail artwork is claimed. Small outfit differences may appear when switching poses.
 
@@ -57,6 +57,8 @@ UncleDev's `action-v1` retains 30 original frames and adds four each for walking
 Blacky's `action-v1` retains 30 original frames and adds four each for side-profile walking, sitting, waking, seated greeting, standing greeting, held and standing dance. Walking is mirrored and departures reverse the greetings. The bust view uses a crop of full-body art; seated dancing uses the sitting sequence with procedural movement. Rebuild with `tools/package-blacky-motion.py` and `../character-sources/blacky-motion-v1`.
 
 Pudding's `action-v1` retains 12 original frames and adds four each for walking, sitting, seated and standing greetings, held and standing dance, plus three waking frames. Walking is mirrored and departures reverse the greetings. Bust action art is cropped and enlarged from full-body artwork; seated dancing uses the sitting sequence with procedural movement. Rebuild with `tools/package-pudding-motion.py` and `../character-sources/pudding-motion-v1`.
+
+Peegee's `action-v1` retains 12 original frames and adds four each for side-profile walking, sitting, waking, seated and standing greetings, held and standing dance. Walking is mirrored and departures reverse the greetings. Bust uses the full-body crop; seated dancing uses the sitting sequence with procedural movement. Rebuild with `tools/package-peegee-motion.py` and `../character-sources/peegee-motion-v1`.
 
 In 0.23.1, Mochi randomly chooses among three coherent ambient paths and three speech paths, excluding the last-used path and varying dwell times. `idleMotion` and `thinkingMotion` map the ambient indices to authored frames. Speech and important states take priority. Mochi's torso uses a calibrated impulse of 45 (previously 32) and visual gain 1.6; the existing gradient/foldover clamps still apply.
 

@@ -918,7 +918,9 @@
     "frameWidth": 320,
     "frameHeight": 420,
     "fps": 2,
-    "spriteManifest": "peegee/motion-full/manifest.json",
+    "spriteManifest": "peegee/action-v1-full/manifest.json",
+    "actionFps": 4,
+    "poseBlendMs": 35,
     "fullHD": true,
     "motionBaseManifest": "peegee/full-hd/manifest.json",
     "conversationPoses": 6
