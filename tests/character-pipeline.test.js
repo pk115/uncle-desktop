@@ -237,6 +237,23 @@ test('Peegee action pack retains existing poses and provides motion tracks',asyn
   }
 });
 
+test('Drunk Uncle action pack keeps existing poses and uses procedural dance',async()=>{
+  const fs=require('node:fs'),{validateManifest}=await load('character-assets.js'),{trackFrame}=await load('character-rig.js');
+  const c=require('../assets/characters/catalog.json').find(c=>c.id==='drunk-uncle');
+  const m=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',c.spriteManifest))));
+  const base=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters/drunk-uncle/motion-full/manifest.json'))));
+  assert.deepEqual(m.crop,base.crop);assert.deepEqual(m.variants.map(v=>v.frameWidth),[320,640]);
+  for(const v of m.variants){
+    const layer=v.layers[0],original=base.variants.find(b=>b.frameWidth===v.frameWidth).layers[0];
+    assert.equal(layer.frames.length,54);
+    for(const name of ['idle','thinking','attention','success','error','sleep','talk'])assert.deepEqual(layer.tracks[name],original.tracks[name]);
+    for(const name of ['walk','sit','wake','perch_arrive','arrive','held'])assert.equal(layer.tracks[name].length,4,name);
+    assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
+    assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'held',actionFps:c.actionFps}),layer.tracks.held[1]);
+    assert.equal(layer.tracks.dance,undefined);
+  }
+});
+
 test('Mochi walks in both directions and stops for interaction or reduced motion',async()=>{
   global.matchMedia ??= () => ({matches:false,addEventListener(){}});
   const {Capri}=await load('capri.js');
@@ -304,6 +321,7 @@ test('dancing requires an actively playing media session',async()=>{
   actor.character.id='bald-man';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='lazy-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='angry-guy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='drunk-uncle';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
