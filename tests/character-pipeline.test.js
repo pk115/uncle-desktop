@@ -145,6 +145,23 @@ test('Lili action packs keep both views and play walking independently of speech
   }
 });
 
+test('Luna action packs retain both resolutions and select new motion tracks',async()=>{
+  const fs=require('node:fs');
+  const {validateManifest}=await load('character-assets.js');
+  const {trackFrame}=await load('character-rig.js');
+  const luna=require('../assets/characters/catalog.json').find(c=>c.id==='luna');
+  for(const file of [luna.spriteManifest,luna.bustManifest]) {
+    const manifest=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',file))));
+    assert.deepEqual(manifest.variants.map(v=>v.frameWidth),[320,640]);
+    for(const {layers:[layer]} of manifest.variants) {
+      assert.equal(layer.tracks.walk.length,4);assert.equal(layer.tracks.sit.length,3);assert.equal(layer.tracks.wake.length,3);
+      assert.equal(layer.tracks.perch_arrive.length,4);assert.deepEqual(layer.tracks.perch_leave,[...layer.tracks.perch_arrive].reverse());
+      assert.equal(layer.tracks.arrive.length,4);assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
+      assert.equal(trackFrame(layer,'idle',250,luna.fps,{stance:'stand',clip:'walk',actionFps:luna.actionFps}),layer.tracks.walk[1]);
+    }
+  }
+});
+
 test('Mochi walks in both directions and stops for interaction or reduced motion',async()=>{
   global.matchMedia ??= () => ({matches:false,addEventListener(){}});
   const {Capri}=await load('capri.js');
@@ -171,7 +188,7 @@ test('available idle actions are equally likely and never randomly select dancin
   const {Capri}=await load('capri.js');
   const previous=Math.random;
   try {
-    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
+    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['luna',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
       for(let i=0;i<expected.length;i++) {
         let action='';Math.random=()=>(i+.5)/expected.length;
         const actor={wander:true,locked:false,stance:'stand',fondness:0,character:{id,renderer:id==='capri'?'capri':undefined},
@@ -203,6 +220,7 @@ test('dancing requires an actively playing media session',async()=>{
   assert.equal(context.dance,false);assert.equal(context.clip,undefined);
   actor.musicDance=true;Capri.prototype.drawFrame.call(actor,101);assert.equal(context.dance,true);
   actor.character.id='lili';actor.stance='sit';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='luna';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
@@ -246,14 +264,18 @@ test('Luna uses the new face for both views and every expression and speech trac
   const luna=require('../assets/characters/catalog.json').find(c=>c.id==='luna');
   const {validateManifest}=await load('character-assets.js');
   for(const key of ['spriteManifest','bustManifest']) {
-    assert.match(luna[key],/luna\/face-0\.22-(full|bust)\/manifest.json$/);
+    assert.match(luna[key],/luna\/action-v1-(full|bust)\/manifest.json$/);
     const file=path.join(__dirname,'../assets/characters',luna[key]);
     const manifest=validateManifest(JSON.parse(fs.readFileSync(file)));
+    const baseFile=key==='spriteManifest'?luna.motionBaseManifest:luna.motionBaseBustManifest;
+    const base=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',baseFile))));
     for(const variant of manifest.variants) {
       const layer=variant.layers[0];
-      assert.equal(layer.frames.length,12);
+      assert.equal(layer.frames.length,30);
       for(const state of ['idle','blink','thinking','attention','success','error','sleep','wave',
-        'talkNeutral','talkPrepare','talkSoft','talkRound','talkEmphasis','talkRest'])assert.ok(layer.tracks[state]?.length,state);
+        'talkNeutral','talkPrepare','talkSoft','talkRound','talkEmphasis','talkRest']) {
+        assert.deepEqual(layer.tracks[state],base.variants.find(v=>v.frameWidth===variant.frameWidth).layers[0].tracks[state],state);
+      }
       for(const page of variant.pages)assert.ok(fs.statSync(path.join(path.dirname(file),page.file)).size>1000);
     }
   }

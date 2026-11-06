@@ -8,7 +8,8 @@ Active packs in catalog.json (source 0.23.10, checked 2026-11-01):
 |---|---|---|---|
 | Mochi | 55 | 55 | 320x420, 640x840 |
 | Lili | 31 | 31 | 320x420, 640x840 |
-| Luna, Pudding, Tama | 12 each | 12 each | 320x420, 640x840 |
+| Luna | 30 | 30 | 320x420, 640x840 |
+| Pudding, Tama | 12 each | 12 each | 320x420, 640x840 |
 | Peegee | 12 | none; renderer crops full-body art | 320x420, 640x840 |
 
 These counts describe the active whole-image layer in each manifest, not every older pack left in the asset directory. They do not imply independent eyes, mouth or hands. Audio switches between authored whole-frame poses; it is not phoneme lip sync. Storage dimensions do not imply that every figure fills its canvas or has native detail at that entire size. No current 960x1260 native-detail artwork is claimed. Small outfit differences may appear when switching poses.
@@ -43,6 +44,8 @@ Mochi's newer `sequence-30-full` and `sequence-30-bust` packs contain 24 state f
 Mochi's active `sequence-motion` packs preserve those 30 frames and add side-profile walking, seated, held, dancing, waking and arrival frames; the departure track reverses the arrival frames. The left-facing walk art is mirrored for rightward walking; asymmetric clothing changes sides when mirrored. New bust action frames are cropped and enlarged from the full-body action art, so they do not have the same native detail as the original dedicated bust frames. `tools/package-mochi-motion.py` rebuilds these packs using source art in `../character-sources/mochi-motion-v1`. Seated dance currently uses seated frames with procedural movement, and the original entrance/exit effects remain active.
 
 Lili's `action-v1` packs retain the existing 12 frames and add four side-profile walking frames, four seated frames, three waking frames, four seated greeting frames and four standing greeting frames. Departure tracks reverse the greeting frames, and the walking art is mirrored for the other direction. New bust action frames are cropped and enlarged from full-body art. Held uses the existing fallback and dance uses procedural movement. Rebuild with `tools/package-lili-motion.py` using the local source images in `../character-sources/lili-motion-v1`.
+
+Luna's `action-v1` packs retain the reference-matched 12 frames and add four side-profile walking frames, three seated frames, three waking frames, four seated greeting frames and four standing greeting frames. Departure reverses the greeting frames; walking is mirrored for the other direction. Bust action frames are cropped and enlarged from full-body artwork. Held uses existing drag physics and dance uses procedural movement while music is playing. Rebuild with `tools/package-luna-motion.py` using the local source images in `../character-sources/luna-motion-v1`.
 
 In 0.23.1, Mochi randomly chooses among three coherent ambient paths and three speech paths, excluding the last-used path and varying dwell times. `idleMotion` and `thinkingMotion` map the ambient indices to authored frames. Speech and important states take priority. Mochi's torso uses a calibrated impulse of 45 (previously 32) and visual gain 1.6; the existing gradient/foldover clamps still apply.
 
