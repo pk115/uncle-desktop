@@ -162,6 +162,26 @@ test('Luna action packs retain both resolutions and select new motion tracks',as
   }
 });
 
+test('Tama action packs provide full and bust tracks without losing existing poses',async()=>{
+  const fs=require('node:fs');
+  const {validateManifest}=await load('character-assets.js');
+  const {trackFrame}=await load('character-rig.js');
+  const tama=require('../assets/characters/catalog.json').find(c=>c.id==='tama');
+  for(const file of [tama.spriteManifest,tama.bustManifest]) {
+    const manifest=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',file))));
+    assert.deepEqual(manifest.variants.map(v=>v.frameWidth),[320,640]);
+    for(const {layers:[layer]} of manifest.variants) {
+      assert.equal(layer.frames.length,40);
+      for(const name of ['walk','sit','wake','perch_arrive','arrive','held','dance'])assert.equal(layer.tracks[name].length,4,name);
+      assert.deepEqual(layer.tracks.perch_leave,[...layer.tracks.perch_arrive].reverse());
+      assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
+      assert.equal(trackFrame(layer,'idle',250,tama.fps,{stance:'held',actionFps:tama.actionFps}),layer.tracks.held[1]);
+      assert.equal(trackFrame(layer,'idle',250,tama.fps,{stance:'stand',dance:true,actionFps:tama.actionFps}),layer.tracks.dance[1]);
+      assert.ok(layer.tracks.talk?.length);
+    }
+  }
+});
+
 test('Mochi walks in both directions and stops for interaction or reduced motion',async()=>{
   global.matchMedia ??= () => ({matches:false,addEventListener(){}});
   const {Capri}=await load('capri.js');
@@ -188,7 +208,7 @@ test('available idle actions are equally likely and never randomly select dancin
   const {Capri}=await load('capri.js');
   const previous=Math.random;
   try {
-    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['luna',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
+    for(const [id,seat,expected] of [['mochi',null,['peek','teleport','flourish','walk']],['mochi',{},['sit','peek','teleport','flourish','walk']],['lili',{},['sit','peek','teleport','flourish','walk']],['luna',{},['sit','peek','teleport','flourish','walk']],['tama',{},['sit','peek','teleport','flourish','walk']],['capri',{},['sit','peek','teleport','flourish','walk']]]) {
       for(let i=0;i<expected.length;i++) {
         let action='';Math.random=()=>(i+.5)/expected.length;
         const actor={wander:true,locked:false,stance:'stand',fondness:0,character:{id,renderer:id==='capri'?'capri':undefined},
@@ -221,6 +241,7 @@ test('dancing requires an actively playing media session',async()=>{
   actor.musicDance=true;Capri.prototype.drawFrame.call(actor,101);assert.equal(context.dance,true);
   actor.character.id='lili';actor.stance='sit';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.character.id='luna';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.character.id='tama';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
