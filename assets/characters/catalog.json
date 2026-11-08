@@ -173,7 +173,9 @@
     "frameWidth": 320,
     "frameHeight": 420,
     "fps": 4,
-    "spriteManifest": "fatty-girl/motion-full/manifest.json",
+    "spriteManifest": "fatty-girl/action-v1-full/manifest.json",
+    "actionFps": 4,
+    "poseBlendMs": 35,
     "conversationPoses": 6,
     "motionBaseManifest": null
   },
