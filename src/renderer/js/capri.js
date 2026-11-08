@@ -580,7 +580,7 @@ export class Capri {
       const seat = this.pickSeat();
       if (seat) actions.push(() => this.sitOn(seat));
       actions.push(() => this.peek(), () => this.teleport(this.spot('random')), () => this.flourish());
-      if (this.stance === 'stand' && ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man','lazy-boy','angry-guy','drunk-uncle','mira','vulture','chubby-girl','cute-girl','fatty-girl'].includes(this.character.id)) actions.push(() => this.characterStroll());
+      if (this.stance === 'stand' && ['mochi','lili','luna','tama','angry-boy','blacky','pudding','peegee','bald-man','lazy-boy','angry-guy','drunk-uncle','mira','vulture','chubby-girl','cute-girl','fatty-girl','pinky'].includes(this.character.id)) actions.push(() => this.characterStroll());
       else if (this.stance === 'stand' && this.character.renderer === 'capri') actions.push(() => this.capriStroll());
     }
     pick(actions)();

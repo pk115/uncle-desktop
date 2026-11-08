@@ -191,7 +191,9 @@
     "frameWidth": 320,
     "frameHeight": 420,
     "fps": 4,
-    "spriteManifest": "pinky/motion-full/manifest.json",
+    "spriteManifest": "pinky/action-v1-full/manifest.json",
+    "actionFps": 4,
+    "poseBlendMs": 35,
     "conversationPoses": 6,
     "motionBaseManifest": null
   },
