@@ -312,17 +312,13 @@ test('dancing requires an actively playing media session',async()=>{
   Capri.prototype.drawFrame.call(actor,100);
   assert.equal(context.dance,false);assert.equal(context.clip,undefined);
   actor.musicDance=true;Capri.prototype.drawFrame.call(actor,101);assert.equal(context.dance,true);
-  actor.character.id='lili';actor.stance='sit';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='luna';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='tama';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='angry-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='blacky';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='pudding';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='peegee';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='bald-man';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='lazy-boy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='angry-guy';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
-  actor.character.id='drunk-uncle';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true);
+  actor.stance='sit';
+  for(const character of require('../assets/characters/catalog.json')) {
+    actor.character=character;Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,true,character.id);
+  }
+  actor.stance='held';Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,false);
+  actor.stance='sit';actor.dragging=true;Capri.prototype.drawFrame.call(actor,102);assert.equal(context.dance,false);
+  actor.dragging=false;
   actor.musicDance=false;Capri.prototype.drawFrame.call(actor,103);assert.equal(context.dance,false);
   actor.musicDance=false;await Capri.prototype.capriDance.call(actor);assert.equal(actor.capriAmbient.name,'dance');
 });
