@@ -55,5 +55,6 @@ if __name__ == '__main__':
                'wake': extract('wake.png'),
                'perch_arrive': extract('perch-arrive.png'),
                'arrive': extract('arrive.png'),
-               'held': extract('held.png')}
+               'held': extract('held.png'),
+               'dance': extract('dance.png')}
     build(actions)

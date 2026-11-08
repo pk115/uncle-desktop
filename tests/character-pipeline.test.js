@@ -237,7 +237,7 @@ test('Peegee action pack retains existing poses and provides motion tracks',asyn
   }
 });
 
-test('Drunk Uncle action pack keeps existing poses and uses procedural dance',async()=>{
+test('Drunk Uncle action pack keeps existing poses and includes dance frames',async()=>{
   const fs=require('node:fs'),{validateManifest}=await load('character-assets.js'),{trackFrame}=await load('character-rig.js');
   const c=require('../assets/characters/catalog.json').find(c=>c.id==='drunk-uncle');
   const m=validateManifest(JSON.parse(fs.readFileSync(path.join(__dirname,'../assets/characters',c.spriteManifest))));
@@ -245,12 +245,13 @@ test('Drunk Uncle action pack keeps existing poses and uses procedural dance',as
   assert.deepEqual(m.crop,base.crop);assert.deepEqual(m.variants.map(v=>v.frameWidth),[320,640]);
   for(const v of m.variants){
     const layer=v.layers[0],original=base.variants.find(b=>b.frameWidth===v.frameWidth).layers[0];
-    assert.equal(layer.frames.length,54);
+    assert.equal(layer.frames.length,58);
     for(const name of ['idle','thinking','attention','success','error','sleep','talk'])assert.deepEqual(layer.tracks[name],original.tracks[name]);
     for(const name of ['walk','sit','wake','perch_arrive','arrive','held'])assert.equal(layer.tracks[name].length,4,name);
     assert.deepEqual(layer.tracks.leave,[...layer.tracks.arrive].reverse());
     assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'held',actionFps:c.actionFps}),layer.tracks.held[1]);
-    assert.equal(layer.tracks.dance,undefined);
+    assert.equal(layer.tracks.dance.length,4);
+    assert.equal(trackFrame(layer,'idle',250,c.fps,{stance:'stand',dance:true,actionFps:c.actionFps}),layer.tracks.dance[1]);
   }
 });
 
@@ -395,6 +396,33 @@ test('Mira has separate full and bust atlases with playable action tracks', asyn
         assert.ok(variant.layers[0].tracks[action]?.length >= 3, `${key}/${action}`);
       }
       for(const page of variant.pages)assert.ok(fs.statSync(path.join(path.dirname(file),page.file)).size>1000);
+    }
+  }
+});
+
+test('every sprite character has valid action frames and safe motion fallbacks', async()=>{
+  const fs=require('node:fs');
+  const characters=require('../assets/characters/catalog.json');
+  const {validateManifest}=await load('character-assets.js');
+  const {trackFrame}=await load('character-rig.js');
+  for(const character of characters.filter(c=>c.renderer!=='capri')) {
+    for(const relative of [character.spriteManifest,character.bustManifest].filter(Boolean)) {
+      const file=path.join(__dirname,'../assets/characters',relative);
+      const manifest=validateManifest(JSON.parse(fs.readFileSync(file)));
+      for(const variant of manifest.variants) {
+        const layer=variant.layers[0];
+        for(const action of ['walk','sit','wake','arrive','leave']) {
+          assert.ok(layer.tracks[action]?.length,`${character.id}/${action}`);
+        }
+        for(const [name,frames] of Object.entries(layer.tracks))for(const frame of frames)
+          assert.ok(Number.isInteger(frame) && frame>=0 && frame<layer.frames.length,`${character.id}/${name}/${frame}`);
+        for(const context of [{stance:'stand',clip:'walk'},{stance:'sit'}, {stance:'held'},
+          {stance:'stand',dance:true},{stance:'sit',dance:true},{stance:'stand',still:true}]) {
+          const frame=trackFrame(layer,'idle',500,character.fps,context);
+          assert.ok(Number.isInteger(frame) && frame>=0 && frame<layer.frames.length,`${character.id}/${JSON.stringify(context)}`);
+        }
+        for(const page of variant.pages)assert.ok(fs.statSync(path.join(path.dirname(file),page.file)).size>1000);
+      }
     }
   }
 });
